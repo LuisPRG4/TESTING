@@ -2693,6 +2693,206 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ✅ ELIMINAR TODOS LOS MOVIMIENTOS (con confirmación)
+async function eliminarTodosLosMovimientos() {
+    if (!confirm(
+        "🚨 ¡ADVERTENCIA EXTREMA!\n\n" +
+        "Estás a punto de eliminar TODOS tus movimientos:\n" +
+        "- Ingresos\n" +
+        "- Gastos\n" +
+        "- Saldos iniciales\n\n" +
+        "⚠️ Esto NO elimina:\n" +
+        "- Categorías\n" +
+        "- Bancos\n" +
+        "- Reglas\n" +
+        "- Tasa guardada\n" +
+        "- Backup\n\n" +
+        "¿Estás ABSOLUTAMENTE seguro? Esta acción NO se puede deshacer."
+    )) {
+        return;
+    }
+
+    try {
+        // Abrir transacción en modo escritura
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readwrite');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+
+        // Borrar TODO el contenido del almacén
+        const request = store.clear();
+
+        request.onsuccess = async () => {
+            alert("✅ ¡Todos los movimientos han sido eliminados!");
+            // Actualizar la interfaz inmediatamente
+            await renderizar();
+            await actualizarSaldo();
+            await actualizarResumenBancosCompleto();
+            await actualizarGrafico();
+            await actualizarBarChart();
+            await renderizarResumenBancos();
+            await actualizarPresupuesto();
+        };
+
+        request.onerror = (event) => {
+            console.error("Error al eliminar todos los movimientos:", event.target.error);
+            alert("❌ Error al eliminar los movimientos. Intenta de nuevo.");
+        };
+
+    } catch (error) {
+        console.error("Error inesperado al eliminar movimientos:", error);
+        alert("❌ Error inesperado. Por favor, recarga la app e intenta de nuevo.");
+    }
+}
+
+// ✅ COMPARACIÓN DE BANCOS: Gráficos de Barras Apiladas y Torta
+async function renderizarComparacionBancos() {
+    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+    
+    // Agrupar por banco: ingresos, gastos, saldo final
+    const bancos = [...new Set(movimientos.map(m => m.banco || '(Sin banco)'))];
+    const comparacion = {};
+    
+    bancos.forEach(banco => {
+        const movimientosBanco = movimientos.filter(m => m.banco === banco);
+        
+        const ingresos = movimientosBanco
+            .filter(m => m.tipo === 'ingreso' && !m.concepto.includes('(Saldo inicial:'))
+            .reduce((sum, m) => sum + m.cantidad, 0);
+            
+        const gastos = movimientosBanco
+            .filter(m => m.tipo === 'gasto')
+            .reduce((sum, m) => sum + m.cantidad, 0);
+            
+        const saldoInicial = movimientosBanco
+            .filter(m => m.concepto.includes('(Saldo inicial:'))
+            .reduce((sum, m) => sum + m.cantidad, 0);
+            
+        const saldoFinal = saldoInicial + ingresos - gastos;
+        
+        comparacion[banco] = {
+            ingresos,
+            gastos,
+            saldoFinal
+        };
+    });
+    
+    // Preparar datos para gráfico de barras apiladas
+    const bancosLabels = Object.keys(comparacion);
+    const ingresosData = bancosLabels.map(b => comparacion[b].ingresos);
+    const gastosData = bancosLabels.map(b => comparacion[b].gastos);
+    const saldoFinalData = bancosLabels.map(b => comparacion[b].saldoFinal);
+    
+    // Preparar datos para gráfico de torta (saldo final como porcentaje del total)
+    const saldoTotal = Object.values(comparacion).reduce((sum, b) => sum + b.saldoFinal, 0);
+    const porcentajes = bancosLabels.map(b => comparacion[b].saldoFinal / saldoTotal * 100);
+    
+    // Limpiar gráficos anteriores si existen
+    if (window.graficoBarrasApiladas) window.graficoBarrasApiladas.destroy();
+    if (window.graficoTortaBancos) window.graficoTortaBancos.destroy();
+    
+    // ✅ GRÁFICO DE BARRAS APILADAS
+    window.graficoBarrasApiladas = new Chart(document.getElementById('graficoBarrasApiladas'), {
+        type: 'bar',
+        data: {
+            labels: bancosLabels,
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: ingresosData,
+                    backgroundColor: '#018642',
+                    borderColor: '#018642',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Gastos',
+                    data: gastosData,
+                    backgroundColor: '#b00020',
+                    borderColor: '#b00020',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Saldo Final',
+                    data: saldoFinalData,
+                    backgroundColor: '#0b57d0',
+                    borderColor: '#0b57d0',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': Bs. ' + formatNumberVE(context.raw);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: false,
+                    title: {
+                        display: true,
+                        text: 'Banco'
+                    }
+                },
+                y: {
+                    stacked: false,
+                    title: {
+                        display: true,
+                        text: 'Monto (Bs)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return 'Bs. ' + formatNumberVE(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // ✅ GRÁFICO DE TORTA (Porcentaje del Saldo Total)
+    window.graficoTortaBancos = new Chart(document.getElementById('graficoTortaBancos'), {
+        type: 'pie',
+        data: {
+            labels: bancosLabels,
+            datasets: [{
+                data: porcentajes,
+                backgroundColor: [
+                    '#0b57d0', '#018642', '#b00020', '#ff9800', '#9c27b0',
+                    '#607d8b', '#cddc39', '#ff5722', '#00bcd4', '#795548'
+                ],
+                borderColor: ['#fff'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                            const porcentaje = Math.round((context.raw / total) * 100);
+                            const banco = context.label;
+                            const saldo = comparacion[banco].saldoFinal;
+                            return `${banco}: ${porcentaje}% (${formatNumberVE(saldo)} Bs)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 // ------------------------------------------------------------------------------------------------------------------------------------
 //                                 Inicialización y Event Listeners
 // ------------------------------------------------------------------------------------------------------------------------------------
@@ -2819,7 +3019,19 @@ document.addEventListener('DOMContentLoaded', async function () {
             });
         });
 
-    }
+            // ✅ Renderizar comparación de bancos al abrir la pestaña
+            document.querySelectorAll('.side-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                const id = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+                if (id === 'comparacion') {
+                renderizarComparacionBancos();
+                }
+        });
+    });
+
+    
+
+}
     
     
     catch (error) {
