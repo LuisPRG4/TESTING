@@ -1,0 +1,629 @@
+/* ---------- FUENTES ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Space+Mono&display=swap');
+
+/* ---------- VARIABLES BASE ---------- */
+:root {
+  --bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --primary: #1a73e8; /* Azul de Google */
+  --primary-light: #5289ed;
+  --text: #202124;
+  --text-light: #5f6368;
+  --success: #0c9849;
+  --danger: #d93025;
+  --radius: 12px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+  --transition: .2s ease-in-out;
+}
+
+/* ---------- MODO OSCURO DEL SISTEMA (solo si no hay clase forzada) ---------- */
+@media (prefers-color-scheme: dark) {
+  body:not(.modo-claro):not(.modo-oscuro) {
+    --bg: #1f1f1f;
+    --card-bg: #2e2e2e;
+    --primary: #4285f4;
+    --primary-light: #669df6;
+    --text: #e8eaed;
+    --text-light: #9aa0a6;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.2);
+  }
+}
+
+/* ---------- CLASES PARA FORZAR TEMA ---------- */
+body.modo-claro {
+  --bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --primary: #1a73e8;
+  --primary-light: #5289ed;
+  --text: #202124;
+  --text-light: #5f6368;
+}
+body.modo-oscuro {
+  --bg: #1f1f1f;
+  --card-bg: #2e2e2e;
+  --primary: #4285f4;
+  --primary-light: #669df6;
+  --text: #e8eaed;
+  --text-light: #9aa0a6;
+}
+
+/* ---------- RESET Y BASE ---------- */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: background var(--transition), color var(--transition);
+}
+
+h1 {
+  font-weight: 300;
+  font-size: 2.25rem;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.5px;
+  color: var(--primary);
+}
+
+/* Sección base - Aumentar ancho mínimo */
+section {
+  width: 100%;
+  min-width: 600px; /* ✅ Mínimo 600px para evitar que se rompa el diseño */
+  max-width: 1200px; /* ✅ Máximo 1200px para no ser demasiado ancho */
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: box-shadow var(--transition);
+}
+
+section:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--text-light);
+    padding-bottom: 0.5rem;
+}
+
+label {
+  display: block;
+  font-size: .875rem;
+  margin-bottom: .25rem;
+  color: var(--text-light);
+}
+
+input, select, .btn-group button {
+  width: 100%;
+  padding: .75rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  background: var(--card-bg);
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, .15);
+}
+
+button {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: .5rem;
+  border-radius: 8px;
+  padding: .75rem 1.5rem;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+button:hover {
+  background: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, .25);
+}
+
+#saldo {
+  font-family: 'Space Mono', monospace;
+  font-size: 2.5rem;
+  font-weight: 500;
+  letter-spacing: -1px;
+  color: var(--text);
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1rem;
+  transition: all var(--transition);
+  border: 1px solid transparent;
+}
+li:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-light);
+}
+
+/* Ajustes para los elementos dentro de la lista de movimientos */
+li .btn-editar, li .btn-eliminar {
+    background: var(--card-bg) !important;
+    border: 1px solid #ccc;
+    color: var(--text);
+    padding: .5rem;
+    width: auto;
+    border-radius: 50% !important;
+    margin: 0;
+    transition: all var(--transition);
+}
+
+li .btn-editar:hover {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary);
+    transform: none;
+    box-shadow: none;
+}
+
+li .btn-eliminar:hover {
+    background: var(--danger) !important;
+    color: white !important;
+    border-color: var(--danger);
+    transform: none;
+    box-shadow: none;
+}
+
+/* ---------- EXTRAS ---------- */
+#nuevaCategoria, #nuevoBanco {
+  margin-top: .5rem;
+}
+
+.button-center {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.button-center button {
+  width: auto;
+  padding: .6rem 1.2rem;
+}
+
+/* ---------- BOTÓN MODO TEMA ---------- */
+#btnTema {
+  background: none;
+  border: 1px solid var(--text);
+  color: var(--text);
+  border-radius: 50%;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: transform .2s;
+  align-self: flex-end;
+}
+
+#btnTema:hover {
+  transform: rotate(30deg);
+}
+
+/* Contenedor lateral - Aumentado y más flexible */
+.sidebar {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  max-width: 1200px;
+  min-width: 600px; /* ✅ Mínimo 600px para evitar que se rompa el diseño */
+  width: 100%;
+  margin: 0 auto;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-lg);
+  border-radius: 20px;
+  padding: 2rem;
+  overflow-x: auto;
+}
+
+/* Pestañas laterales */
+.side-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  width: 200px; /* ancho fijo de pestañas */
+}
+
+.side-tab {
+  background: none;
+  color: var(--text-light);
+  border: none;
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  text-align: left;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all var(--transition);
+}
+
+.side-tab.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  border-left: 4px solid var(--primary);
+  transform: translateX(4px);
+}
+
+.side-tab:hover {
+  background: rgba(0,0,0,0.05);
+}
+body.modo-oscuro .side-tab:hover {
+    background: rgba(255,255,255,0.05);
+}
+body.modo-claro .side-tab.active {
+    background: var(--primary);
+}
+body.modo-oscuro .side-tab.active {
+    background: var(--primary);
+}
+
+/* Contenido lateral */
+.side-content {
+  display: none;
+  flex: 1; /* ocupa el resto del ancho */
+  animation: fadeIn .6s var(--transition);
+}
+
+.side-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilo para el botón de la flecha */
+#btnToggleLista {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform var(--transition);
+    padding: 0;
+}
+#btnToggleLista:hover {
+    transform: none;
+    background: none;
+}
+
+/* ---------- BASE RESPONSIVE ---------- */
+
+@media (max-width: 900px) {
+  body { padding: 1rem; }
+  .sidebar {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+  .side-tabs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    gap: .5rem;
+  }
+  .side-tab {
+    white-space: nowrap;
+    font-size: .9rem;
+    padding: .5rem .75rem;
+  }
+  section {
+    padding: 1rem;
+  }
+  h1 {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  body { padding: .75rem; }
+  .side-tabs { gap: .25rem; }
+  .side-tab {
+    font-size: .8rem;
+    padding: .4rem .6rem;
+  }
+  section {
+    padding: .75rem;
+    margin-bottom: 1rem;
+  }
+  h1 {
+    font-size: 1.3rem;
+  }
+}
+
+/* Evitar zoom en iOS al tocar inputs */
+input, select, button { touch-action: manipulation; }
+
+/* Evitar desbordamiento de texto */
+body { overflow-wrap: break-word; hyphens: auto; }
+
+/* Animación suave para el aviso */
+#avisoPinOlvidado {
+    animation: pulse 1.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from { opacity: 0.6; }
+    to { opacity: 1; }
+}
+
+/* ✅ CONTROL DE TEXTO EN TABLA DE BANCOS */
+/* Tabla de resumen por banco - Diseño flexible */
+#tablaBancos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+  table-layout: fixed; /* ✅ Fija el ancho de las columnas */
+}
+
+#tablaBancos th,
+#tablaBancos td {
+  padding: 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid #ddd;
+  word-break: break-all; /* ✅ Rompe palabras largas */
+  white-space: normal; /* ✅ Permite saltos de línea naturales */
+  overflow-wrap: break-word; /* ✅ Evita desbordamientos */
+  overflow: hidden; /* ✅ Oculta lo que se sale */
+  text-overflow: ellipsis; /* ✅ Añade "..." si se corta demasiado */
+}
+
+/* Columna de Banco — ancho fijo para nombres largos */
+#tablaBancos th:first-child,
+#tablaBancos td:first-child {
+  width: 28%; /* ✅ 28% del ancho total para el nombre del banco */
+  text-align: left; /* ✅ Alinear a la izquierda para mejor lectura */
+  font-weight: 500;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 250px; /* ✅ Límite máximo de ancho */
+}
+
+/* Columnas de cantidades — ancho fijo y alineación derecha */
+#tablaBancos th:nth-child(2),
+#tablaBancos td:nth-child(2),
+#tablaBancos th:nth-child(3),
+#tablaBancos td:nth-child(3),
+#tablaBancos th:nth-child(4),
+#tablaBancos td:nth-child(4),
+#tablaBancos th:nth-child(5),
+#tablaBancos td:nth-child(5) {
+  width: 18%; /* ✅ 18% para cada columna de monto */
+  text-align: right;
+  font-family: 'Space Mono', monospace; /* ✅ Fuente monoespaciada para números */
+  letter-spacing: -0.2px;
+}
+
+/* Asegurar que el último td (saldo final) no se vea más ancho */
+#tablaBancos td:last-child {
+  font-weight: 700;
+  text-align: right;
+}
+
+#tablaBancos th,
+#tablaBancos td {
+  padding: 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid #ddd;
+  word-break: break-all; /* ✅ Rompe palabras largas */
+  white-space: normal; /* ✅ Permite saltos de línea */
+  overflow-wrap: break-word; /* ✅ Evita desbordamientos */
+  overflow: hidden; /* ✅ Oculta lo que se sale */
+  text-overflow: ellipsis; /* ✅ Añade "..." si se corta demasiado */
+}
+
+/* ✅ Columna de Banco — ancho fijo para nombres largos */
+#tablaBancos th:first-child,
+#tablaBancos td:first-child {
+  width: 28%;
+  text-align: left;
+  font-weight: 500;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 250px;
+}
+
+/* ✅ Columnas de cantidades — ancho fijo y alineación derecha */
+#tablaBancos th:nth-child(2),
+#tablaBancos td:nth-child(2),
+#tablaBancos th:nth-child(3),
+#tablaBancos td:nth-child(3),
+#tablaBancos th:nth-child(4),
+#tablaBancos td:nth-child(4),
+#tablaBancos th:nth-child(5),
+#tablaBancos td:nth-child(5) {
+  width: 18%;
+  text-align: right;
+  font-family: 'Space Mono', monospace; /* ✅ Fuente monoespaciada para números */
+  letter-spacing: -0.2px;
+}
+
+/* ✅ Asegurar que el último td (saldo final) no se vea más ancho */
+#tablaBancos td:last-child {
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ✅ CONTROL DE TEXTO EN LA LISTA DE MOVIMIENTOS */
+li > div:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ✅ Evitar que el concepto se salga del contenedor */
+li input[type="text"] {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* ✅ Evitar que el banco y categoría se salgan */
+li div:nth-child(3) {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* ✅ Asegurar que los números en el dashboard no se desborden */
+#saldo,
+#totalGeneral,
+#equivalente {
+  font-family: 'Space Mono', monospace;
+  word-break: break-all;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* ✅ CALENDARIO VISUAL */
+#calendario {
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+#calendario div {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 6px;
+  background: #f9f9f9;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+#calendario div:hover {
+  background: #e8f0fe;
+  transform: scale(1.05);
+}
+
+#calendario div.dia-con-movimiento {
+  background: linear-gradient(135deg, #0b57d0, #5289ed);
+  color: white;
+  font-weight: 600;
+}
+
+#calendario div.dia-con-movimiento::after {
+  content: '';
+  position: absolute;
+  bottom: 0.1rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  background: white;
+  border-radius: 50%;
+}
+
+#calendario div.dia-hoy {
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  margin: -0.25rem;
+  padding: 0.25rem;
+  background: transparent;
+  color: var(--primary);
+  font-weight: bold;
+}
+
+#calendario div.dia-hoy::after {
+  content: '';
+  position: absolute;
+  bottom: 0.1rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  background: var(--primary);
+  border-radius: 50%;
+}
+
+#calendario div.dia-otro {
+  color: var(--text-light);
+  opacity: 0.5;
+}
+
+#detallesDia {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ✅ RESPONSIVE */
+@media (max-width: 768px) {
+  #calendario {
+    grid-template-columns: repeat(7, 1fr);
+    font-size: 0.8rem;
+  }
+  #calendario div {
+    padding: 0.15rem;
+  }
+}
+
+/* ✅ ESTILOS PARA LA PESTAÑA DE AHORRO */
+#graficoAhorro {
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
