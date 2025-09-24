@@ -548,7 +548,7 @@ async function renderizar() {
 
         // Calcular comisión si es gasto
         const esGasto = m.tipo === 'gasto';
-        const comision = esGasto ? m.comision.toFixed(2) : null; // ✅ Usar la comisión guardada
+        const comision = esGasto && m.comision !== undefined && !isNaN(m.comision) ? m.comision.toFixed(2) : null;
 
         li.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:.25rem; flex:1; margin-bottom: .5rem; min-width:0;">
