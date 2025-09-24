@@ -21,6 +21,7 @@
       <button class="side-tab" onclick="mostrarSideTab('herramientas')">🛠️ Herramientas</button>
       <button class="side-tab" onclick="mostrarSideTab('calendario')">📅 Calendario</button>
       <button class="side-tab" onclick="mostrarSideTab('ahorro')">📈 Ahorro Mensual</button>
+      <button class="side-tab" onclick="mostrarSideTab('comparacion')">🏦 Comparación de Bancos</button>
       <button class="side-tab" onclick="mostrarSideTab('config')">⚙️ Config</button>
     </nav>
 
@@ -401,6 +402,32 @@
   </section>
 </div>
 
+  <div class="side-content" id="side-comparacion">
+  <section>
+    <h2>🏦 Comparación de Bancos</h2>
+    <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+      Visualiza cómo se comportan tus bancos: ingresos, gastos y saldo final.
+    </p>
+
+    <!-- Gráfico de Barras Apiladas -->
+    <h3>📊 Ingresos, Gastos y Saldo por Banco</h3>
+    <canvas id="graficoBarrasApiladas" height="200"></canvas>
+
+    <!-- Gráfico de Torta (Saldo Total por Banco) -->
+    <h3>🥧 Porcentaje del Saldo Total por Banco</h3>
+    <canvas id="graficoTortaBancos" height="200"></canvas>
+
+    <!-- Nota explicativa -->
+    <p style="font-size:0.85rem; color:var(--text-light); margin-top:2rem; text-align:center;">
+      📌 Estos gráficos se actualizan automáticamente con tus movimientos.  
+      ¡Verás qué banco es tu aliado y cuál es tu mayor gasto!
+    </p>
+  </section>
+</div>
+
+
+
+
     <div class="side-content" id="side-config">
       <section id="panelReglas">
         <h2>Reglas de automatización</h2>
@@ -493,6 +520,18 @@
     🛠️ Reparar Visualización (Firefox/Chrome)
   </button>
   </details>
+
+  <details style="margin-top: 1.5rem; color: #b00020;">
+  <summary style="color: #b00020;">⚠️ Eliminar todos los movimientos</summary>
+  <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:0.75rem;">
+    ⚠️ ¡ADVERTENCIA! Esto eliminará TODOS tus movimientos (ingresos, gastos, saldos iniciales).  
+    Esto NO borra tus categorías, bancos, reglas, tasa o backup.  
+    Solo los movimientos.
+  </p>
+  <button onclick="eliminarTodosLosMovimientos()" style="width:100%; padding:1rem; background:#b00020; color:white; border:none; border-radius:8px; font-size:1rem;">
+    🗑️ Eliminar TODOS los movimientos
+  </button>
+</details>
 
       </section>
     </div>
