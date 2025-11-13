@@ -414,6 +414,75 @@ function openDB() {
     });
 }
 
+/**
+ * Función de utilidad: Asigna la empresa activa actual a *todos* los movimientos
+ * que no tienen un empresaId válido (null, undefined, 0).
+ * Útil para corregir datos existentes manualmente.
+ */
+async function reasignarMovimientosAEmpresaActiva() {
+    try {
+        console.log("[REASIGNACIÓN MASIVA] Iniciando...");
+
+        // Obtener la empresa activa
+        const empresaAsignar = getEmpresaActiva();
+
+        if (!empresaAsignar) {
+            console.warn("[REASIGNACIÓN MASIVA] No hay ninguna empresa activa. No se puede reasignar.");
+            mostrarToast('⚠️ No hay una empresa activa seleccionada. Por favor, selecciona una empresa primero.', 'warning');
+            return;
+        }
+
+        console.log(`[REASIGNACIÓN MASIVA] Usando empresa activa: ${empresaAsignar.nombre} (ID: ${empresaAsignar.id})`);
+
+        // Obtener todos los movimientos
+        const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+
+        // Filtrar movimientos que NO tienen un empresaId válido
+        const movimientosSinEmpresaValida = movimientos.filter(m => !m.empresaId || m.empresaId === 0);
+        // Opcional: Filtrar también los que tengan un ID de empresa que no exista
+        const todasLasEmpresas = await getAllEmpresas();
+        const idsEmpresasExistentes = new Set(todasLasEmpresas.map(e => e.id));
+        const movimientosConEmpresaInvalida = movimientos.filter(m => m.empresaId && !idsEmpresasExistentes.has(m.empresaId));
+        const movimientosAReasignar = [...new Set([...movimientosSinEmpresaValida, ...movimientosConEmpresaInvalida])]; // Unión y eliminación de duplicados
+
+        if (movimientosAReasignar.length === 0) {
+            console.log("[REASIGNACIÓN MASIVA] No hay movimientos para reasignar.");
+            mostrarToast('✅ No hay movimientos sin empresa o con empresa inválida para reasignar.', 'info');
+            return;
+        }
+
+        console.log(`[REASIGNACIÓN MASIVA] Encontrados ${movimientosAReasignar.length} movimientos para reasignar.`);
+
+        // Actualizar los movimientos en la base de datos
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readwrite');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+
+        let contador = 0;
+        for (const movimiento of movimientosAReasignar) {
+            // Verificar si el ID de empresa es inválido o no existe, o es nulo/undefined
+            if (!movimiento.empresaId || movimiento.empresaId === 0 || !idsEmpresasExistentes.has(movimiento.empresaId)) {
+                movimiento.empresaId = empresaAsignar.id; // Asignar el ID de la empresa activa
+                await new Promise((resolve, reject) => {
+                    const request = store.put(movimiento); // put actualiza el registro
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+                contador++;
+            }
+        }
+
+        console.log(`[REASIGNACIÓN MASIVA] Reasignación completada. Se actualizaron ${contador} movimientos.`);
+        mostrarToast(`✅ Reasignación completada: ${contador} movimientos asignados a "${empresaAsignar.nombre}"`, 'success');
+
+        // Opcional: Volver a renderizar la lista de movimientos para reflejar el cambio inmediatamente
+        await renderizar();
+
+    } catch (error) {
+        console.error("[REASIGNACIÓN MASIVA] Error durante la reasignación de movimientos:", error);
+        mostrarToast('❌ Error al reasignar movimientos. Revisa la consola.', 'danger');
+    }
+}
+
 // Funciones genéricas para interactuar con la DB con manejo de errores mejorado
 async function addEntry(storeName, entry) {
     try {
