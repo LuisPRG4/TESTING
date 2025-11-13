@@ -3,40 +3,235 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sistema Financiero Personal (SFP)</title>
-  <link rel="icon" type="image/x-icon" href="recursos/ICONO.png">
+  <title>Sistema de Gestión Financiera</title>
+  <link rel="icon" type="image/x-icon" href="recursos/logo/SGF SS.png">
 
- <link rel="stylesheet" href="styles.css?v=20250420" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css?v=20251111" />
+  <link rel="stylesheet" href="deudas.css?v=20251111" />
+  <link rel="stylesheet" href="win11-theme.css?v=20251111">
+  <link rel="stylesheet" href="movimientos-cards-fixed.css?v=20251111">
+  
+  <script src="enhanced-cards.js"></script>
+  <script src="backup-manager.js"></script>
+
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 </head>
 <body>
-  <div style="text-align:right; margin-bottom:.5rem;">
-    <button id="btnTema" title="Cambiar tema">🌓</button>
-  </div>
-  <h1 style="text-align:center; margin-bottom:1rem;">Sistema Financiero Personal (SFP)</h1>
-  <div class="sidebar">
-    <nav class="side-tabs">
-      <button class="side-tab active" onclick="mostrarSideTab('dashboard')">📊 Dashboard</button>
-      <button class="side-tab" onclick="mostrarSideTab('movimientos')">💳 Movimientos</button>
-      <button class="side-tab" onclick="mostrarSideTab('analisis')">📈 Análisis</button>
-      <button class="side-tab" onclick="mostrarSideTab('presupuesto')">💰 Presupuesto</button>
-      <button class="side-tab" onclick="mostrarSideTab('herramientas')">🛠️ Herramientas</button>
-      <button class="side-tab" onclick="mostrarSideTab('calendario')">📅 Calendario</button>
-      <button class="side-tab" onclick="mostrarSideTab('ahorro')">📈 Ahorro Mensual</button>
-      <button class="side-tab" onclick="mostrarSideTab('comparacion')">🏦 Comparación de Bancos</button>
-      <button class="side-tab" onclick="mostrarSideTab('config')">⚙️ Config</button>
-    </nav>
 
-    <div class="side-content active" id="side-dashboard">
+  <!-- ✅ SONIDOS PARA CAMBIO DE PESTAÑAS -->
+  <audio id="sonidoCambioPestana" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhEUOlV1TFXhAxQ==" type="audio/wav">
+  </audio>
+
+  <!-- Contenedor para el título y el botón de tema con estilo de cristal -->
+<div style="position: relative; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.8); border-radius: var(--radius); box-shadow: var(--shadow-sm); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); /* Borde sutil */">
+  <!-- Botón de tema -->
+  <button id="btnTema" title="Cambiar tema" style="background: none; border: 1px solid var(--text); color: var(--text); border-radius: 50%; width: 2.2rem; height: 2.2rem; font-size: 1.2rem; cursor: pointer; transition: all 0.2s; padding: 0.25rem; box-shadow: var(--shadow-sm);">🌓</button>
+
+  <!-- Título -->
+  <h1 style="text-align: center; margin: 0; font-size: 3rem; color: var(--primary); font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);">Sistema de Gestión Financiera</h1>
+
+  <!-- Botón de bloqueo manual (opcional) -->
+  <button id="btnBloqueoManual" title="Bloquear aplicación" style="display: none; background: none; border: none; color: #dc2626; font-size: 1.2rem; cursor: pointer; padding: 0.25rem; border-radius: 50%; transition: transform 0.2s; box-shadow: var(--shadow-sm);">🔒</button>
+</div>
+  
+  
+  <div class="sidebar">
+
+    <div class="sidebar-content">
+
+    <aside class="win11-nav">
+      <div class="nav-header">
+    <!-- Logo grande en la parte superior -->
+    <div style="display: flex; justify-content: center; align-items: center; margin: 0.5rem 0;">
+        <div style="position: relative; width: 50px; height: 50px; border-radius: 50%; background: var(--card-bg); padding: 0.2rem; box-shadow: var(--shadow-xs); transition: transform 0.3s ease;">
+            <img src="recursos/logo/SGF SS.png" alt="Logo del Sistema" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.2)); transform: scale(1.3); transition: transform 0.3s ease;">
+            <!-- Efecto de brillo en el borde -->
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(45deg, transparent, rgba(26, 115, 232, 0.1), transparent); pointer-events: none;"></div>
+        </div>
+    </div>
+
+    <!-- Barra de búsqueda en la parte inferior -->
+    <div class="nav-search">
+        <input type="text" id="navSearch" placeholder="🔍Buscar pestañas..." />
+    </div>
+</div>
+    
+      <nav class="side-tabs">
+
+        <!-- Después de <nav class="side-tabs"> agregar: -->
+
+<!-- ✅ NUEVA PESTAÑA: DASHBOARD -->
+<div class="category-badge">💰 FINANZAS</div>
+<button class="side-tab active" onclick="mostrarSideTab('dashboard')">
+  <img class="icon-png" src="recursos/icons//Nueva carpeta/Home.png" alt="Inicio">
+  Inicio
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: MOVIMIENTOS -->
+<button class="side-tab" onclick="mostrarSideTab('movimientos')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Movimiento.png" alt="Movimientos">
+  Movimientos
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: EMPRESAS (SISTEMA MULTI-EMPRESA) -->
+<button class="side-tab" onclick="mostrarSideTab('empresas')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Empresa.png" alt="Empresas">
+  Empresas
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: ANALISIS -->
+<button class="side-tab" onclick="mostrarSideTab('analisis')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Análisis.png" alt="Analisis">
+  Análisis
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: PRESUPUESTO -->
+<button class="side-tab" onclick="mostrarSideTab('presupuesto')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Presupuesto.png" alt="Presupuesto">
+  Presupuesto
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: PRESUPUESTO SUGERIDO -->
+<button class="side-tab" onclick="mostrarSideTab('presupuesto-sugerido')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Presupuesto sugerido.png" alt="Presupuesto sugerido">
+  Presupuesto Sugerido
+</button>
+
+<!-- ✅ NUEVA PESTAÑA DEUDAS -->
+<button class="side-tab" onclick="mostrarSideTab('deudas')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Deuda.png" alt="Deudas">
+  Deudas
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: PROVEEDORES Y PAGOS -->
+<button class="side-tab" onclick="mostrarSideTab('proveedores-pagos')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Proveedores y pagos.png" alt="Proveedores y pagos">
+Proveedores y Pagos
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: INVENTARIO / ACTIVOS -->
+<button class="side-tab" onclick="mostrarSideTab('inventario-activos')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Inventario.png" alt="Inventario / activos">
+Inventario / Activos
+</button>
+
+<!-- ✅ PESTAÑA AHORRO -->
+<button class="side-tab" onclick="mostrarSideTab('ahorro')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Ahorro.png" alt="Ahorro">
+  Ahorro
+</button>
+
+<!-- ✅ MOVER INVERSIONES A FINANZAS -->
+<button class="side-tab" onclick="mostrarSideTab('inversiones')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Inversiones.png" alt="Inversiones">
+  Inversiones
+</button>
+
+<div class="nav-category-separator"></div>
+
+<!-- SEPARADOR -->
+<div class="category-badge">🛠️ HERRAMIENTAS</div>
+
+<!-- HERRAMIENTAS -->
+<button class="side-tab" onclick="mostrarSideTab('herramientas')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Herramientas.png" alt="Herramientas">
+  Herramientas
+</button>
+
+<!-- RECORDATORIOS -->
+<button class="side-tab" onclick="mostrarSideTab('recordatorios')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Reloj.png" alt="Recordatorios">
+  Recordatorios
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: NOTAS -->
+<button class="side-tab" onclick="mostrarSideTab('notas')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Notas.png" alt="Notas">
+  Notas
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: CALENDARIO VISUAL -->
+<button class="side-tab" onclick="mostrarSideTab('calendario')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Calendario.png" alt="Calendario">
+  Calendario
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: TASAS BCV -->
+<button class="side-tab" onclick="mostrarSideTab('tasas-bcv')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Tasa.png" alt="Tasas">
+  Tasas BCV
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: OPTIMIZACIÓN FISCAL -->
+<button class="side-tab" onclick="mostrarSideTab('optimizacion-fiscal')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Optimización fiscal.png" alt="Optimización fiscal">
+  Optimización Fiscal
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: REPORTES GERENCIALES -->
+<button class="side-tab" onclick="mostrarSideTab('reportes-gerenciales')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Reporte gerencial.png" alt="Reportes gerenciales">
+Reportes Gerenciales
+</button>
+
+<!-- ✅ NUEVA PESTAÑA: ASISTENTE FINANCIERO -->
+<button class="side-tab" onclick="mostrarSideTab('asistente-financiero')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Asistente financiero.png" alt="Asistente financiero">
+Asistente Financiero
+</button>
+
+<!-- SEPARADOR -->
+<div class="nav-category-separator"></div>
+
+<!-- CONFIGURACIÓN -->
+<div class="category-badge">⚙️ CONFIGURACIÓN</div>
+
+<!-- PESTAÑA CONFIGURACIÓN -->
+<button class="side-tab" onclick="mostrarSideTab('cambios')">
+  <img class="icon-png" src="recursos/icons/Cambios.png" alt="Cambios">
+  Cambios
+</button>
+
+<!-- PESTAÑA CONFIGURACIÓN -->
+<button class="side-tab" onclick="mostrarSideTab('config')">
+  <img class="icon-png" src="recursos/icons/Nueva carpeta/Ajustes.png" alt="Configuración">
+  Configuración
+</button>
+
+
+</nav>
+  </aside>
+
+  <div class="side-content active" id="side-dashboard">
+    <div class="sidebar-content">
       <section id="buscador">
+
         <input type="text" id="txtBuscar" placeholder="🔍 Buscar..." />
       </section>
+
+
       <section id="resumen">
-        <h2>Resumen</h2>
+
+        <h2>Resumen 
+    <button onclick="mostrarAyudaDashboard()" 
+            style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+            title="¿Qué significa cada sección?">❓</button>
+</h2>
+
         <p>Saldo actual: <strong id="saldo">Bs. 0,00</strong></p>
   <p id="saldoAviso" style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.25rem; display: none;">
   💡 Este saldo incluye una comisión del 0.3% aplicada automáticamente a cada gasto.
   </p>
+
+  <div style="text-align: center; margin-top: 1rem; font-size: 0.875rem; color: var(--text-light);">
+    <span>Versión del sistema: </span><span id="versionDashboard" style="font-weight: 600; color: var(--primary);">1.0.4</span>
+</div>
 
   <p style="font-size:0.85rem; color:var(--text-light); margin-top:0.5rem;">
   📁 <strong>¿Cuidas tus datos?</strong> Haz un backup: <a href="#" onclick="exportarBackup()" style="color:var(--primary); text-decoration:underline;">Exportar</a>
@@ -71,6 +266,32 @@
           </div>
         </div>
       </section>
+
+<!-- ✅ NUEVA SECCIÓN: WIDGETS PERSONALIZABLES (OCULTA POR DEFECTO) -->
+<div style="margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
+  <!-- Botón para desplegar/ocultar -->
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--card-bg); cursor: pointer; transition: all 0.2s ease;" onclick="toggleWidgets()">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <svg class="icon" id="flechaWidgets" viewBox="0 0 24 24" fill="#6B7280" style="width: 1rem; height: 1rem; transition: transform 0.2s;"><path d="M16 12l-4 4-4-4H16z"/></svg>
+      <h2 style="color: var(--text); margin: 0; font-size: 1rem;">📊 Widgets Personalizables<button onclick="mostrarAyudaWidgets()"style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"title="¿Cómo personalizar los widgets?">❓</button></h2>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button onclick="mostrarConfiguracionWidgets()" id="btnConfigWidgets" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.25rem; border-radius: 4px; font-size: 0.8rem; transition: background 0.2s;" title="Configurar widgets">⚙️</button>
+      <button onclick="agregarWidget()" style="background: var(--success); color: white; border: none; border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; cursor: pointer;">➕</button>
+    </div>
+  </div>
+
+  <!-- Contenido oculto (se mostrará con animación) -->
+  <div id="contenidoWidgets" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; opacity: 0; padding: 0 1.5rem 1.5rem 1.5rem; background: var(--card-bg);">
+    <!-- Los widgets se cargarán dinámicamente aquí -->
+    <div id="contenedorWidgets"></div>
+    <div id="mensajeSinWidgets" style="text-align: center; padding: 2rem; color: var(--text-light);">
+      <p>📭 No tienes widgets personalizados aún.</p>
+      <p>Haz clic en "➕" para agregar tu primer widget.</p>
+    </div>
+  </div>
+</div>
+
       <section id="alertaSaldo" style="display:none;">
         <p style="color:var(--danger); font-weight:500;">
           ⚠️ Tu saldo está por debajo de Bs. <span id="umbralAlerta">500</span>
@@ -94,19 +315,40 @@
   </thead>
   <tbody></tbody>
   </table>
-      </section>
-    </div>
+
+</section>
+</div> <!-- cierre sidebar-content DASHBOARD -->
+</div>
 
 
+<div class="side-content" id="side-movimientos">
+  <div class="sidebar-content">
+    <section>
 
-    <div class="side-content" id="side-movimientos">
-      <section>
-        <h2>Agregar Movimiento</h2>
+
+      <h2>Agregar Movimiento 
+        <button onclick="mostrarAyudaMovimientos()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo agregar y gestionar movimientos?">❓</button>
+    </h2>
+
         <label for="saldoInicial">Saldo Inicial (opcional, solo se aplica una vez):
           <input type="text" id="saldoInicial" placeholder="Ej: 3.220,90" style="width:100%; padding:.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem;" />
+
+          <!-- Debajo de <input type="text" id="saldoInicial" ... /> -->
+          <div id="avisoModoSaldo" style="font-size:0.75rem; color:var(--text-light); margin-top:0.25rem; display:none;">
+            📌 Modo: <strong id="modoActualSaldo">Automático</strong>
+          </div>
+
         </label>
         <input type="text" id="concepto" placeholder="Concepto" />
         <input type="text" id="cantidad" placeholder="Ej: 3.000,77" />
+
+          <!-- Debajo de <input type="text" id="cantidad" ... /> -->
+          <div id="avisoModoCantidad" style="font-size:0.75rem; color:var(--text-light); margin-top:0.25rem; display:none;">
+            📌 Modo: <strong id="modoActualCantidad">Automático</strong>
+          </div>
+
         <select id="tipo">
           <option value="ingreso">Ingreso</option>
           <option value="gasto">Gasto</option>
@@ -133,6 +375,14 @@
         </label>
         <input type="text" id="nuevoBanco" placeholder="Nombre del banco" style="display:none;" />
 
+        <label>Empresa:
+          <div style="display:flex; gap:.5rem;">
+            <select id="empresaMovimiento">
+              <option value="">Selecciona una empresa</option>
+              <option value="">Sin empresa</option>
+            </select>
+          </div>
+        </label>
 
         <label>Fecha:
           <input type="date" id="fechaMov" />
@@ -157,8 +407,37 @@
         Movimientos
         <button id="btnToggleLista" onclick="toggleLista()">
             <span id="iconoFlecha">▼</span>
-        </button>
+        </button> 
     </h2>
+
+    <!-- Buscador específico para movimientos -->
+<div style="margin-bottom: 1rem; position: relative; display: flex; align-items: center; width: 100%;">
+  <input type="text" id="buscadorMovimientos" placeholder="🔍 Buscar movimientos por concepto, categoría o banco..." 
+         style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; padding-right: 40px; box-sizing: border-box;" />
+  <button type="button" id="limpiarBusqueda" style="
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: none; /* ¡IMPORTANTE! Oculto por defecto */
+    border-radius: 50%;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  " title="Limpiar búsqueda">
+    ✕
+  </button>
+</div>
+    
         <div id="listaContenedor" style="display: none;">
         <ul id="listaMovimientos"></ul>
         <div id="controlesPaginacion" style="margin-top: 1rem; text-align: center;"></div>
@@ -185,6 +464,10 @@
             <button onclick="mostrarSeleccionFecha()" style="padding:1rem; border:none; border-radius:8px; background:#ff9800; color:white; font-size:1rem; cursor:pointer; transition:background .2s;">
     📅 Reporte por Fecha
 </button>
+
+            <button onclick="mostrarSeleccionEmpresa()" style="padding:1rem; border:none; border-radius:8px; background:#9c27b0; color:white; font-size:1rem; cursor:pointer; transition:background .2s;">
+    🏢 Reporte por Empresa
+</button>
         </div>
         <button onclick="cerrarModalReporte()" style="margin-top:1.5rem; padding:0.75rem; border:none; border-radius:8px; background:var(--danger); color:white; font-size:0.9rem; cursor:pointer; width:100%;">
             ❌ Cancelar
@@ -208,14 +491,186 @@
     <button onclick="generarReportePorFecha()">Generar</button>
     <button onclick="cerrarFormFecha()">Cancelar</button>
   </div>
-      </div>
-      <div class="button-center">
-        <button onclick="exportarExcel()">📊 Exportar Excel</button>
+
+  <!-- Formulario oculto para seleccionar empresa -->
+  <div id="formEmpresa" style="display:none;">
+    <select id="selectEmpresaReporte">
+        <option value="">Selecciona una empresa</option>
+    </select>
+
+    <!-- Rango de fechas opcional -->
+    <div style="margin: 15px 0;">
+      <label style="display: block; margin-bottom: 8px; font-weight: bold;">📅 Rango de fechas (opcional):</label>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <label style="flex: 1; min-width: 140px;">
+          Desde
+          <input type="date" id="fechaDesdeEmpresa" style="width: 100%;">
+        </label>
+        <label style="flex: 1; min-width: 140px;">
+          Hasta
+          <input type="date" id="fechaHastaEmpresa" style="width: 100%;">
+        </label>
       </div>
     </div>
-    <div class="side-content" id="side-analisis">
+
+    <!-- Opciones de nivel de detalle -->
+    <div style="margin: 15px 0;">
+      <label style="display: block; margin-bottom: 8px; font-weight: bold;">📋 Nivel de detalle:</label>
+      <label style="display: block; margin: 5px 0;">
+        <input type="radio" name="nivelDetalle" value="resumen" checked> 
+        Solo resumen por banco
+      </label>
+      <label style="display: block; margin: 5px 0;">
+        <input type="radio" name="nivelDetalle" value="completo"> 
+        Resumen + detalle de movimientos
+      </label>
+    </div>
+    
+    <!-- Opción de formato -->
+    <div style="margin: 15px 0;">
+      <label style="display: block; margin-bottom: 8px; font-weight: bold;">🖨️ Formato:</label>
+      <label style="display: block; margin: 5px 0;">
+        <input type="radio" name="formatoExportacion" value="imprimir" checked> 
+        Imprimir (ventana nueva)
+      </label>
+    </div>
+    
+    <button onclick="generarReportePorEmpresa()">Generar</button>
+    <button onclick="cerrarFormEmpresa()">Cancelar</button>
+  </div>
+
+        </div>
+      <div class="button-center">
+        <button onclick="exportarExcel()">📊 Exportar Excel</button>
+
+      </div>
+    </div> <!-- cierre sidebar-content MOVIMIENTOS-->
+  </div>
+
+<!-- ===================================================== -->
+<!-- 💰 PESTAÑA: PRESUPUESTO SUGERIDO -->
+<!-- ===================================================== -->
+<div class="side-content" id="side-presupuesto-sugerido">
+  <div class="sidebar-content">
+    <section>
+      <h2>💰 Presupuesto Sugerido</h2>
+
+      <label for="presupuestoInicial">Presupuesto inicial (Bs):</label>
+      <input type="text" id="presupuestoInicial" placeholder="Ej: 5.000,00" style="width:100%; padding:.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem;" />
+
+      <label for="porcentajeExtra" style="margin-top:1rem; display:block;">Porcentaje adicional (%)</label>
+<input type="number" id="porcentajeExtra" value="10" min="0" step="1"
+       style="width:100%; padding:.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem;"
+       placeholder="Ej: 10">
+
+       <!-- ✅ NUEVO BLOQUE: RANGO DE FECHAS -->
+<div style="display:flex; gap:1rem; margin-top:1rem; flex-wrap:wrap;">
+  <label style="flex:1; font-size:0.9rem; color:var(--text-light);">
+    Desde:
+    <input type="date" id="fechaDesdePresupuesto" 
+           style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #ccc; font-size:1rem;">
+  </label>
+  <label style="flex:1; font-size:0.9rem; color:var(--text-light);">
+    Hasta:
+    <input type="date" id="fechaHastaPresupuesto" 
+           style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #ccc; font-size:1rem;">
+  </label>
+</div>
+<p style="font-size:0.8rem; color:var(--text-light); margin-top:0.25rem;">
+  📅 Define el rango de fechas de los movimientos que se usarán en el cálculo del presupuesto.
+</p>
+
+      <h3 style="margin-top:1rem;">Selecciona las categorías a incluir:</h3>
+<select id="selectCategoriasPresupuesto" multiple 
+        style="width:100%; height:140px; padding:.5rem; border:1px solid #ccc; border-radius:8px; font-size:1rem;">
+</select>
+<p style="font-size:0.8rem; color:var(--text-light); margin-top:0.25rem;">
+  💡 Puedes mantener presionada <strong>Ctrl</strong> (o <strong>Cmd</strong> en Mac) para seleccionar varias categorías.
+</p>
+
+
+      <button onclick="calcularPresupuestoSugerido()" 
+              style="background:#059669; color:white; padding:0.75rem 1rem; border:none; border-radius:8px; cursor:pointer;">
+        Calcular presupuesto sugerido
+      </button>
+
+      <div id="resultadoPresupuesto" style="margin-top:1.5rem; font-size:1rem; color:var(--text-light);">
+        <!-- Aquí aparecerá el resultado -->
+      </div>
+
+      <div id="barraPresupuestoContainer" style="margin-top: 1rem;"></div>
+
+      <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+  <button onclick="guardarPresupuestoEnHistorial()" 
+          style="background:#2563eb; color:white; border:none; border-radius:8px; padding:0.6rem 1rem; cursor:pointer;">
+    📦 Guardar en historial
+  </button>
+  <button onclick="reiniciarPresupuestoSugerido()" 
+          style="background:#dc2626; color:white; border:none; border-radius:8px; padding:0.6rem 1rem; cursor:pointer;" class="btn-secundario">
+    🔁 Reiniciar
+  </button>
+</div>
+
+<hr style="margin:1.5rem 0; border:none; border-top:1px solid #ccc;"/>
+
+<div id="contenedorHistorial" style="margin-top:1.5rem;">
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <h3 style="margin:0;">🕓 Historial de presupuestos sugeridos</h3>
+    <div style="display:flex; align-items:center; gap:.5rem;">
+      <button id="btnToggleHistorial"
+              onclick="toggleHistorial()"
+              style="background:#6b7280; color:white; border:none; border-radius:6px; padding:0.4rem 0.6rem; cursor:pointer;">
+        ⬆️ Ocultar
+      </button>
+      <button onclick="eliminarHistorialPresupuestos()" 
+              style="background:#dc2626; color:white; border:none; border-radius:6px; padding:0.4rem 0.6rem; cursor:pointer;">
+        🗑️ Eliminar
+      </button>
+
+      <button onclick="exportarReportePresupuestos()" 
+              style="background:#059669; color:white; border:none; border-radius:6px; padding:0.4rem 0.6rem; cursor:pointer;">
+        📤 Exportar
+    </button>
+
+    </div>
+  </div>
+
+  <div id="historialWrapper" style="margin-top:0.75rem;">
+    <ul id="historialPresupuestos" 
+        style="list-style:none; padding:0; font-size:0.95rem; color:var(--text-light);"></ul>
+
+    <div id="paginacionHistorial" 
+         style="display:flex; justify-content:center; gap:0.5rem; margin-top:0.5rem;">
+      <button id="btnPrevPagina" onclick="cambiarPaginaHistorial(-1)"
+              style="background:#374151; color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer;">◀️</button>
+      <span id="paginaActual" style="align-self:center;">1</span>
+      <button id="btnNextPagina" onclick="cambiarPaginaHistorial(1)"
+              style="background:#374151; color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer;">▶️</button>
+
+      <!-- ✅ BOTÓN DE IMPRESIÓN -->
+      <button onclick="imprimirHistorialPresupuestos()" 
+              style="background:#6b7280; color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer; margin-left:0.5rem;">
+          🖨️ Imprimir Historial
+      </button>
+    </div>
+  </div>
+</div>
+
+    </section> <!-- cierre section -->
+  </div>
+</div>
+
+
+  <div class="side-content" id="side-analisis">
+    <div class="sidebar-content">
       <section id="grafico">
-        <h2>Gastos por categoría</h2>
+
+        <h2>Gastos por categoría 
+          <button onclick="mostrarAyudaAnalisis()" 
+                  style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                  title="¿Cómo interpretar los gráficos?">❓</button>
+      </h2>
+
         <canvas id="torta" style="max-width:100%; height:auto;"></canvas>
       </section>
       <section id="barras">
@@ -228,15 +683,22 @@
           <option value="">Todos los bancos</option>
         </select>
         <ul id="listaBancos"></ul>
-      </section>
+
+
+            </section>
+      </div> <!-- cierre sidebar-content ANALISIS -->
     </div>
 
-
-
-
     <div class="side-content" id="side-presupuesto">
-      <section id="presupuestoMeta">
-  <h2>🎯 Meta de Presupuesto</h2>
+      <div class="sidebar-content">
+        <section id="presupuestoMeta">
+
+          <h2>🎯 Meta de Presupuesto 
+            <button onclick="mostrarAyudaPresupuesto()" 
+                    style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                    title="¿Cómo funciona esta pestaña?">❓</button>
+        </h2>
+
   <p style="margin-bottom: 1rem; color: var(--text-light);">Define tu meta mensual y tu progreso actual.</p>
   <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
     <div style="flex:1;">
@@ -245,7 +707,7 @@
     </div>
     <div style="flex:1;">
       <label for="presupuestoActual">Gasto actual (Bs):</label>
-      <input type="number" id="presupuestoActual" placeholder="Automático" readonly style="background:var(--card-bg); color:var(--text-light); cursor:not-allowed;" />
+      <input type="text" id="presupuestoActual" placeholder="Automático" readonly style="background:var(--card-bg); color:var(--text-light); cursor:not-allowed; font-family: 'Space Mono', monospace; text-align: right;" />
     </div>
   </div>
   <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem;">
@@ -272,22 +734,32 @@
       </section>
 
       <section id="presupuestoDetalles">
-  <h2>🔍 Desglose de Gastos (últimos 30 días)</h2>
-  <ul id="listaPresupuestoDetalles"></ul>
+        <h2>📊 Gastos por categoría (últimos 30 días)</h2>
+
+  <ul id="listaPresupuestoDetalles" style="padding: 0; margin: 0;"></ul>
+
   <div style="text-align:center; margin-top:1rem;">
     <button onclick="actualizarPresupuesto()" style="background:#0b57d0; color:white; border:none; border-radius:8px; padding:0.5rem 1rem; font-size:0.9rem;">Actualizar</button>
   </div>
   <p id="leyendaPresupuesto" style="margin-top:1.5rem; font-size:0.85rem; color:var(--text-light); text-align:center; font-style:italic; max-width:400px; margin-left:auto; margin-right:auto; display:none;">
     📌 <strong>¿Sin meta?</strong> Esta pestaña muestra tu gasto real. Define una meta para ver tu progreso.
   </p>
-  </section>
 
-    </div>
+</section>
+</div> <!-- cierre sidebar-content PRESPUESTO -->
+</div>
 
-    <!-- ✅ PEGA AQUÍ LO QUE COPIASTE (LA HERRAMIENTA) -->
-  <div class="side-content" id="side-herramientas">
-    <section>
-      <h2>🛠️ Formateador de Números</h2>
+    <!-- (FORMATEADOR DE NÚMEROS) -->
+    <div class="side-content" id="side-herramientas">
+      <div class="sidebar-content">
+        <section>
+
+          <h2>🛠️ Formateador de Números 
+            <button onclick="mostrarAyudaHerramientas()" 
+                    style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                    title="¿Para qué sirven estas herramientas?">❓</button>
+        </h2>
+
       <p style="color: var(--text-light); margin-bottom: 1.5rem;">
         Pega o escribe cualquier número (ej: 1111783.99) y lo convertiremos automáticamente a formato venezolano: <strong>1.111.783,99</strong>.
       </p>
@@ -309,130 +781,504 @@
         ⚠️ Esta herramienta no guarda datos. Solo te ayuda a formatear antes de agregar un movimiento.
       </p>
     </section>
+
+   <!-- ✅ NUEVA HERRAMIENTA: CÁLCULO DE EQUIVALENTE -->
+<section style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--text-light);">
+  <h2>📊 Calculadora de Equivalente</h2>
+  <p style="color: var(--text-light); margin-bottom: 1rem;">
+    Usa el saldo de <strong>Disponibilidad Total</strong> (de la pestaña Dashboard) y conviértelo a otra moneda.
+  </p>
+
+  <div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+    <label style="flex:1; font-size:0.875rem; color:var(--text-light);">
+      Convertir a:
+      <select id="monedaHerramienta" style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #ccc; margin-top:0.5rem;">
+        <option value="USD">Dólar (USD)</option>
+        <option value="EUR">Euro (EUR)</option>
+        <option value="COP">Peso Colombiano (COP)</option>
+        <option value="ARS">Peso Argentino (ARS)</option>
+        <option value="MXN">Peso Mexicano (MXN)</option>
+      </select>
+    </label>
   </div>
 
+  <label for="tasaHerramienta">Tasa del día (Bs):</label>
+  <input type="text" id="tasaHerramienta" 
+         placeholder="Ej: 169,98 o 8333,33" 
+         style="width:100%; padding:1rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;"
+         title="Ingresa la tasa como la ves en tu app de banco: 169,98, 8.333,33, 8333.33 — ¡no se formatea!" />
+
+  <div style="display:flex; gap:0.75rem; margin-bottom:1.5rem;">
+    <button id="btnCalcularEquivalente" style="flex:1; background:#0b57d0; color:white; border:none; border-radius:8px; padding:1rem; font-size:1rem;">📊 Calcular Equivalente</button>
+    <button id="btnLimpiarEquivalente" style="flex:1; background:#ff9800; color:white; border:none; border-radius:8px; padding:1rem; font-size:1rem;">🧹 Limpiar</button>
+  </div>
+
+  <div style="background:var(--card-bg); padding:1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom:1.5rem;">
+    <label>Equivalente:</label>
+    <div id="equivalenteHerramienta" style="font-family:'Space Mono', monospace; font-size:1.8rem; font-weight:600; color:var(--primary); padding:1rem; background:#f9f9f9; border-radius:6px; margin-top:0.5rem;">
+      --
+    </div>
+  </div>
+
+  <p style="font-size:0.85rem; color:var(--text-light);">
+    📌 Esta herramienta toma el saldo de <strong>Disponibilidad Total</strong> (Bs. <code id="totalGeneral">0,00</code>) de la pestaña Dashboard.  
+    No depende de tu tasa guardada en el dashboard.  
+    ¡Tienes control total!
+  </p>
+
+</section>
+</div> <!-- cierre sidebar-content Herramientas-->
+</div>
+
+
+<!-- ✅ NUEVA PESTAÑA: CALENDARIO VISUAL INTERACTIVO -->
 <div class="side-content" id="side-calendario">
-  <section>
-    <h2>📅 Calendario de Movimientos</h2>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-      <button onclick="cambiarMes(-1)" style="padding:0.5rem 1rem; background:#0b57d0; color:white; border:none; border-radius:8px; font-size:1rem;">← Mes anterior</button>
-      <h3 id="mesActual" style="font-size:1.5rem; font-weight:600; color:var(--text);">Abril 2025</h3>
-      <button onclick="cambiarMes(1)" style="padding:0.5rem 1rem; background:#0b57d0; color:white; border:none; border-radius:8px; font-size:1rem;">Mes siguiente →</button>
-    </div>
-    <div id="calendario" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:0.25rem; margin-bottom:1.5rem; font-size:0.85rem;">
-      <!-- Se rellena dinámicamente -->
-    </div>
-    
-    <div id="detallesDia" style="background:var(--card-bg); padding:1rem; border-radius:8px; border:1px solid #eee; display:none; margin-top:1rem;">
-  <!-- ✅ Eliminamos el título de fecha -->
-  <ul id="listaMovimientosDia" style="list-style:none; padding:0; margin:0;"></ul>
-</div>
-
-  </section>
-</div>
-
-<div class="side-content" id="side-ahorro">
-  <section>
-    <h2>📈 Ahorro Mensual</h2>
-    <p style="color: var(--text-light); margin-bottom: 1.5rem;">
-      Basado en tus movimientos de los últimos 3 meses, te mostramos tu tendencia real.
-    </p>
-
-    <!-- Resumen -->
-    <div style="background:var(--card-bg); padding:1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom:2rem;">
-      <h3 style="margin-bottom:1rem; color:var(--primary);">Tendencia de los últimos 3 meses</h3>
-      <div style="display:flex; flex-wrap:wrap; gap:1.5rem; margin-bottom:1.5rem;">
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#f0f7ff;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Ingresos promedio</div>
-          <div id="ingresosPromedio" style="font-size:1.5rem; font-weight:600; color:#018642; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#fff0f0;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Gastos promedio</div>
-          <div id="gastosPromedio" style="font-size:1.5rem; font-weight:600; color:#b00020; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#f0fff0;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Ahorro mensual</div>
-          <div id="ahorroPromedio" style="font-size:1.5rem; font-weight:600; color:#0b57d0; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Simulador -->
-    <h3>💡 Simulador: ¿Qué pasa si reduzco mis gastos?</h3>
-    <div style="margin-bottom:1.5rem;">
-      <label for="reduccionGastos">Reducción de gastos:</label>
-      <select id="reduccionGastos" style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #ccc; margin-bottom:1rem;">
-        <option value="0">Ninguna (0%)</option>
-        <option value="10">10%</option>
-        <option value="20">20%</option>
-        <option value="30">30%</option>
-        <option value="40">40%</option>
-        <option value="50">50%</option>
-      </select>
-    </div>
-
-    <div style="background:var(--card-bg); padding:1.5rem; border-radius:8px; border:1px solid #eee; margin-bottom:2rem;">
-      <h4 style="margin-bottom:1rem; color:var(--primary);">Resultado de la simulación</h4>
-      <div style="display:flex; flex-wrap:wrap; gap:1.5rem; margin-bottom:1.5rem;">
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#f0f7ff;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Ingresos</div>
-          <div id="ingresosSimulado" style="font-size:1.5rem; font-weight:600; color:#018642; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#fff0f0;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Gastos simulados</div>
-          <div id="gastosSimulado" style="font-size:1.5rem; font-weight:600; color:#b00020; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-        <div style="flex:1; min-width:200px; text-align:center; padding:1rem; border-radius:8px; background:#f0fff0;">
-          <div style="font-size:0.85rem; color:var(--text-light);">Ahorro simulado</div>
-          <div id="ahorroSimulado" style="font-size:1.5rem; font-weight:600; color:#0b57d0; margin-top:0.5rem;">Bs. 0,00</div>
-        </div>
-      </div>
-      <p style="font-size:0.85rem; color:var(--text-light); text-align:center;">
-        🚀 ¡Reducir gastos es la clave para crecer financieramente!
+  <div class="sidebar-content">
+    <section>
+      <h2>📅 Calendario de Movimientos
+        <button onclick="mostrarAyudaCalendario()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funciona este calendario?">❓</button>
+      </h2>
+      <p style="color: var(--text-light); margin-bottom: 1.5rem; font-size: 0.85rem;">
+        Ver tus movimientos por día en un calendario visual moderno. Haz clic en un día para ver sus movimientos.
       </p>
+
+      <!-- ✅ CALENDARIO VISUAL (solo mes actual) -->
+      <div id="calendarContainer" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem; margin-bottom: 1.5rem; max-width: 300px; margin-left: auto; margin-right: auto;">
+        <!-- Los días se generarán dinámicamente aquí -->
+      </div>
+
+      <div style="text-align: center; font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem;">
+        <span id="calendarMonthYear">Septiembre 2025</span>
+      </div>
+
+      <!-- ✅ NAVEGACIÓN POR MES -->
+      <div style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1rem; font-size: 0.85rem; color: var(--text-light);">
+        <button onclick="cambiarMes(-1)" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.5rem; border-radius: 50%; font-size: 1.2rem; transition: background 0.2s;">←</button>
+        <span id="calendarMonthYearNav">Septiembre 2025</span>
+        <button onclick="cambiarMes(1)" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.5rem; border-radius: 50%; font-size: 1.2rem; transition: background 0.2s;">→</button>
+      </div>
+
+      <!-- ✅ LEGENDA -->
+      <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; font-size: 0.75rem; color: var(--text-light);">
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <div style="width: 6px; height: 6px; background: var(--primary); border-radius: 50%;"></div>
+          <span>Movimiento</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <div style="width: 10px; height: 10px; background: var(--primary); border-radius: 50%; border: 1px solid var(--text-light);"></div>
+          <span>Hoy</span>
+        </div>
+      </div>
+
+      <!-- ✅ LISTA DE TARJETAS DE MOVIMIENTOS (oculta al inicio) -->
+      <div id="movimientosDiaContainer" style="margin-top: 2rem; display: none;">
+        <h3 style="margin-bottom: 1rem; color: var(--text); text-align: center;">Movimientos del <span id="fechaSeleccionada">01 de Septiembre 2025</span></h3>
+        <div id="tarjetasMovimientos" class="presupuesto-grid" style="margin-bottom: 1rem;">
+          <!-- Las tarjetas se generarán aquí dinámicamente -->
+        </div>
+        <div id="paginacionTarjetas" class="paginacion-presupuesto" style="justify-content: center; margin-top: 1.5rem; display: none;">
+          <button onclick="cambiarPaginaTarjetas(-1)" id="btnAnteriorTarjetas" disabled>←</button>
+          <span class="paginacion-info" id="infoPaginacion">Página 1 de 1</span>
+          <button onclick="cambiarPaginaTarjetas(1)" id="btnSiguienteTarjetas" disabled>→</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- INVERSIONES-->
+<div class="side-content" id="side-inversiones">
+  <div class="sidebar-content">
+    <section>
+      <h2>Simulador de Inversiones 
+        <button onclick="mostrarAyudaInversiones()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funciona el simulador de inversiones?">❓</button>
+      </h2>
+      <p style="color: var(--text-light); margin-bottom: 1rem;">
+        Simula inversiones en acciones, criptomonedas o fondos. Los precios se actualizan automáticamente.
+      </p>
+
+      <!-- Formulario para agregar nueva inversión -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+        <h3 style="margin-top: 0;">Agregar Inversión</h3>
+        <label for="activoInversion">Activo (ej: AAPL, BTC):</label>
+        <input type="text" id="activoInversion" placeholder="Símbolo del activo" />
+
+        <label for="cantidadInvertida">Cantidad invertida (Bs):</label>
+        <input type="text" id="cantidadInvertida" placeholder="Ej: 1000" />
+
+        <label for="fechaInversion">Fecha de inversión:</label>
+        <input type="date" id="fechaInversion" />
+
+        <label for="tipoActivo">Tipo de activo:</label>
+        <select id="tipoActivo">
+          <option value="accion">Acción</option>
+          <option value="cripto">Criptomoneda</option>
+          <option value="fondo">Fondo de inversión</option>
+        </select>
+
+        <button onclick="agregarInversion()">Agregar Inversión</button>
+      </div>
+
+      <!-- Lista de inversiones actuales -->
+      <div>
+        <h3>Mis Inversiones</h3>
+        <ul id="listaInversiones"></ul>
+      </div>
+
+      <!-- Gráfico de rendimiento -->
+      <div style="margin-top: 2rem;">
+        <h3>Rendimiento</h3>
+        <canvas id="graficoInversiones" style="max-width: 100%; height: 300px;"></canvas>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- DEUDAS Y PRÉSTAMOS-->
+<div class="side-content" id="side-deudas">
+  <div class="sidebar-content">
+    <section id="registroDeuda">
+      <h2>💰 Registrar Nueva Deuda/Préstamo
+        <button onclick="mostrarAyudaDeudas()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo gestionar deudas y préstamos?">❓</button>
+      </h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <label>
+          <input type="radio" name="tipoDeuda" value="debo" checked> Le debo a alguien
+        </label>
+        <label>
+          <input type="radio" name="tipoDeuda" value="me_deben"> Alguien me debe
+        </label>
+      </div>
+
+      <input type="text" id="nombreDeudor" placeholder="Nombre de la persona/entidad" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+
+      <input type="text" id="montoDeuda" placeholder="Monto (ej: 50.00)" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+
+      <select id="monedaDeuda" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;">
+        <option value="USD">Dólar (USD)</option>
+        <option value="EUR">Euro (EUR)</option>
+        <option value="VES">Bolívar (VES)</option>
+      </select>
+
+      <input type="date" id="fechaDeuda" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+
+      <label style="display: block; margin-bottom: 0.5rem;">
+        <input type="checkbox" id="tieneInteres"> Tiene interés (% anual)
+      </label>
+      
+      <div id="camposInteres" style="display: none; margin-bottom: 1rem;">
+        <input type="number" id="tasaInteres" placeholder="Tasa de interés (%)" step="0.01" min="0" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;" />
+      </div>
+
+      <label style="display: block; margin-bottom: 0.5rem;">
+        <input type="checkbox" id="tieneFechaVencimiento"> Tiene fecha de vencimiento
+      </label>
+      
+      <div id="camposVencimiento" style="display: none; margin-bottom: 1rem;">
+        <input type="date" id="fechaVencimiento" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;" />
+      </div>
+
+      <textarea id="descripcionDeuda" placeholder="Descripción/observaciones (opcional)" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem; min-height: 80px; resize: vertical;"></textarea>
+
+      <div style="display: flex; gap: 0.75rem;">
+        <button onclick="guardarDeuda()" style="flex: 1; background: #0b57d0; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem;">💾 Guardar Deuda</button>
+        <button onclick="limpiarFormularioDeuda()" style="flex: 1; background: #6b7280; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem;">🧹 Limpiar</button>
+      </div>
+    </section>
+
+    <section id="listaDeudas">
+      <h2>📋 Mis Deudas/Préstamos</h2>
+      <div id="filtrosDeudas" style="margin-bottom: 1rem;">
+        <select id="filtroEstadoDeuda" style="margin-right: 0.5rem; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;">
+          <option value="">Todas las deudas</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="pagada">Pagadas</option>
+          <option value="vencida">Vencidas</option>
+        </select>
+        <select id="filtroTipoDeuda" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;">
+          <option value="">Todos los tipos</option>
+          <option value="debo">Debo dinero</option>
+          <option value="me_deben">Me deben dinero</option>
+        </select>
+      </div>
+      <div id="contenedorDeudas">
+        <!-- Las deudas se cargarán dinámicamente aquí -->
+      </div>
+    </section>
+
+    <section id="resumenDeudas">
+      <h2>📊 Resumen de Deudas</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div style="background: var(--card-bg); padding: 1rem; border-radius: var(--radius); text-align: center;">
+          <p style="color: var(--text-light); margin: 0 0 0.5rem 0;">Total que debo</p>
+          <p style="font-size: 1.5rem; font-weight: 600; color: var(--danger); margin: 0;">Bs. <span id="totalDebo">0,00</span></p>
+        </div>
+        <div style="background: var(--card-bg); padding: 1rem; border-radius: var(--radius); text-align: center;">
+          <p style="color: var(--text-light); margin: 0 0 0.5rem 0;">Total que me deben</p>
+          <p style="font-size: 1.5rem; font-weight: 600; color: var(--success); margin: 0;">Bs. <span id="totalMeDeben">0,00</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="alertasDeudas">
+      <h2>🚨 Alertas de Vencimiento</h2>
+      <div id="contenedorAlertas">
+        <p style="color: var(--text-light); text-align: center; font-style: italic;">No hay alertas pendientes</p>
+      </div>
+    </section>
+
+    <section id="calculadoraIntereses">
+      <h2>🧮 Calculadora de Intereses</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label>Capital:</label>
+          <input type="text" id="capitalInteres" placeholder="1000" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;" />
+        </div>
+        <div>
+          <label>Tasa anual (%):</label>
+          <input type="number" id="tasaInteresCalc" placeholder="12" step="0.01" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;" />
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label>Período (años):</label>
+          <input type="number" id="periodoInteres" placeholder="1" step="0.01" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;" />
+        </div>
+        <div>
+          <label>Monto final:</label>
+          <input type="text" id="montoFinalInteres" readonly style="width: 100%; padding: 0.5rem; background: var(--card-bg); border: 1px solid #ccc; border-radius: 6px;" />
+        </div>
+      </div>
+      <button onclick="calcularIntereses()" style="width: 100%; background: var(--primary); color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem;">📊 Calcular Intereses</button>
+    </section>
+
+    <section id="exportarDeudas">
+      <h2>📄 Exportar Plan de Pagos</h2>
+      <div style="margin-bottom: 1rem;">
+        <label>Seleccionar deuda:</label>
+        <select id="deudaParaPlan" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;">
+          <option value="">Selecciona una deuda</option>
+        </select>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label>Número de pagos:</label>
+          <input type="number" id="numPagos" placeholder="12" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;" />
+        </div>
+        <div>
+          <label>Frecuencia:</label>
+          <select id="frecuenciaPagos" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;">
+            <option value="mensual">Mensual</option>
+            <option value="quincenal">Quincenal</option>
+            <option value="semanal">Semanal</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="generarPlanPagosPDF()" style="width: 100%; background: #059669; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem;">📄 Generar PDF</button>
+    </section>
+  </div>
+</div>
+
+<!-- ✅ NUEVA SECCIÓN: REGISTRO DE CAMBIOS -->
+<!-- Cambios y actualizaciones-->
+<div class="side-content" id="side-cambios">
+  <div class="sidebar-content">
+    <section id="cambios">
+
+     <!-- Imagen de logo (ajustado al máximo sin perder calidad) -->
+<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1rem;">
+    <div style="position: relative; width: 90px; height: 90px; border-radius: 50%; background: var(--card-bg); padding: 0.2rem; box-shadow: var(--shadow-md); transition: transform 0.3s ease;">
+        <img src="recursos/logo/SGF SS.png" alt="Logo del Sistema" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.2)); transform: scale(1.25); transition: transform 0.3s ease;">
+        <!-- Efecto de brillo en el borde -->
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(45deg, transparent, rgba(26, 115, 232, 0.1), transparent); pointer-events: none;"></div>
     </div>
-
-    <!-- Gráfico de tendencia -->
-    <h3>📊 Tendencia mensual (últimos 3 meses)</h3>
-    <canvas id="graficoAhorro" height="150"></canvas>
-
-    <!-- Nota explicativa -->
-    <p style="font-size:0.85rem; color:var(--text-light); margin-top:2rem; text-align:center;">
-      ⚠️ Esta calculadora usa solo tus movimientos de los últimos 3 meses.  
-      Cuantos más movimientos tengas, más precisa será la estimación.
-    </p>
-  </section>
 </div>
 
-  <div class="side-content" id="side-comparacion">
-  <section>
-    <h2>🏦 Comparación de Bancos</h2>
-    <p style="color: var(--text-light); margin-bottom: 1.5rem;">
-      Visualiza cómo se comportan tus bancos: ingresos, gastos y saldo final.
-    </p>
+      <h2>🔄 Registro de Cambios</h2>
+      <p style="text-align: center; margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-light);">
+        Versión actual del sistema: <span id="versionActual" style="font-weight: 600; color: var(--primary);">1.1.2</span>
+      </p>
 
-    <!-- Gráfico de Barras Apiladas -->
-    <h3>📊 Ingresos, Gastos y Saldo por Banco</h3>
-    <canvas id="graficoBarrasApiladas" height="200"></canvas>
+      <!-- Versión 1.1.2 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--success);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--success);">✨ Versión 1.1.2 - <span style="color: var(--text-light); font-weight: normal;">(23 Oct 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>🔒 Seguridad Mejorada:</strong> Sistema de bloqueo con PIN y preguntas de seguridad, reemplazando la opción de "reset".</li>
+          <li><strong>💬 Asistente Financiero Actualizado:</strong> Eliminado el modo conversacional no profesional y enfocado en datos financieros empresariales.</li>
+          <li><strong>🎨 Diseño de Cristal (Glassmorphism):</strong> Nuevo estilo de fondo en el encabezado con efecto de vidrio elegante.</li>
+          <li><strong>📌 Organización de Pestañas:</strong> Movida la pestaña "Recordatorios" dentro de "Herramientas" para mayor coherencia.</li>
+          <li><strong>📊 Funcionalidad de Notificaciones:</strong> Sistema de notificaciones push para recordatorios y alertas.</li>
+          <li><strong>🛠️ Herramientas de Formateo:</strong> Mejoras en la herramienta de formato de números y conversiones.</li>
+          <li><strong>📦 Inventario / Activos:</strong> Nueva sección para registrar y gestionar bienes físicos o intangibles.</li>
+        </ul>
+      </div>
 
-    <!-- Gráfico de Torta (Saldo Total por Banco) -->
-    <h3>🥧 Porcentaje del Saldo Total por Banco</h3>
-    <canvas id="graficoTortaBancos" height="200"></canvas>
+      <!-- Versión 1.1.1 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--info);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--info);">🚀 Versión 1.1.1 - <span style="color: var(--text-light); font-weight: normal;">(22 Oct 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>🎨 Rediseño Completo de Iconos:</strong> Todos los íconos de la barra lateral han sido actualizados a un estilo moderno y consistente.</li>
+          <li><strong>🧩 Nueva Pestaña de Asistente Financiero:</strong> Agregado el módulo de IA para sugerencias inteligentes y automatización de tareas.</li>
+          <li><strong>📈 Mejoras en Reportes Gerenciales:</strong> Se ha optimizado la visualización de datos y se han añadido nuevas métricas.</li>
+          <li><strong>🔧 Optimización Fiscal:</strong> Nueva sección para gestionar deducciones y optimizar impuestos.</li>
+          <li><strong>🛠️ Correcciones de Bug:</strong> Solucionado el problema de renderizado en Firefox y Chrome.</li>
+        </ul>
+      </div>
 
-    <!-- Nota explicativa -->
-    <p style="font-size:0.85rem; color:var(--text-light); margin-top:2rem; text-align:center;">
-      📌 Estos gráficos se actualizan automáticamente con tus movimientos.  
-      ¡Verás qué banco es tu aliado y cuál es tu mayor gasto!
-    </p>
-  </section>
+      <!-- Versión 1.1.0 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--success);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--success);">✨ Versión 1.1.0 - <span style="color: var(--text-light); font-weight: normal;">(15 Oct 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>📅 Calendario Visual Interactivo:</strong> Nuevo calendario que muestra tus movimientos por día con tarjetas dinámicas.</li>
+          <li><strong>💰 Presupuesto Sugerido:</strong> Sistema inteligente que propone un presupuesto basado en tus gastos históricos.</li>
+          <li><strong>📊 Gráficos de Comparación de Bancos:</strong> Ahora puedes ver la distribución de tus fondos entre diferentes cuentas bancarias.</li>
+          <li><strong>🔔 Recordatorios Avanzados:</strong> Añadida la opción de repetición (diaria, semanal, mensual) y configuración global.</li>
+          <li><strong>📦 Inventario / Activos:</strong> Nueva sección para registrar y gestionar tus bienes físicos o intangibles.</li>
+        </ul>
+      </div>
+
+      <!-- Versión 1.0.4 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--warning);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--warning);">⚙️ Versión 1.0.4 - <span style="color: var(--text-light); font-weight: normal;">(05 Oct 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>📱 Diseño Responsivo Mejorado:</strong> El sistema ahora se adapta perfectamente a pantallas pequeñas y móviles.</li>
+          <li><strong>🔊 Sonidos Personalizables:</strong> Puedes activar/desactivar los sonidos al cambiar de pestañas y elegir el tono.</li>
+          <li><strong>🔒 Seguridad Mejorada:</strong> Implementado el sistema de bloqueo manual con PIN para mayor privacidad.</li>
+          <li><strong>📚 Herramientas de Formateo:</strong> Nuevas herramientas para formatear números y convertir monedas de forma rápida.</li>
+          <li><strong>📋 Notas Personales:</strong> Agregada la posibilidad de crear, editar y eliminar notas dentro del sistema.</li>
+        </ul>
+      </div>
+
+      <!-- Versión 1.0.3 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--primary);">📌 Versión 1.0.3 - <span style="color: var(--text-light); font-weight: normal;">(01 Oct 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>🎯 Rediseño del Menú Lateral:</strong> Nueva organización por categorías y mejor jerarquía visual.</li>
+          <li><strong>🔍 Buscador del Dashboard:</strong> Funcionalidad completa para buscar movimientos directamente desde el resumen.</li>
+          <li><strong>📊 Análisis de Gastos:</strong> Gráficos de barras y torta para entender mejor tus patrones de gasto.</li>
+          <li><strong>📉 Presupuesto Dinámico:</strong> El sistema ahora calcula automáticamente tu progreso hacia la meta mensual.</li>
+          <li><strong>💾 Backup Automático:</strong> Copias de seguridad automáticas para proteger tus datos financieros.</li>
+        </ul>
+      </div>
+
+      <!-- Versión 1.0.2 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--danger);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--danger);">🐛 Versión 1.0.2 - <span style="color: var(--text-light); font-weight: normal;">(25 Sep 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>✅ Corrección de Bugs:</strong> Solucionado el error en el modo literal de entrada de números.</li>
+          <li><strong>🖼️ Mejoras Visuales:</strong> Actualizados los colores y estilos de los botones y tarjetas.</li>
+          <li><strong>⏱️ Rendimiento Optimizado:</strong> El sistema carga más rápido y consume menos memoria.</li>
+          <li><strong>📝 Documentación Interna:</strong> Añadidas guías de ayuda (tooltips) para todas las funciones principales.</li>
+        </ul>
+      </div>
+
+      <!-- Versión 1.0.1 -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--text-light);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--text-light);">📦 Versión 1.0.1 - <span style="color: var(--text-light); font-weight: normal;">(20 Sep 2025)</span></h3>
+        <ul style="color: var(--text-light); line-height: 1.6; margin: 0; padding-left: 1.5rem;">
+          <li><strong>📁 Estructura Inicial:</strong> Primera versión estable del sistema con funcionalidades básicas.</li>
+          <li><strong>💸 Gestión de Movimientos:</strong> Módulo principal para registrar ingresos y gastos.</li>
+          <li><strong>📊 Resumen General:</strong> Dashboard inicial con saldo total y resumen por banco.</li>
+          <li><strong>⚙️ Configuración Básica:</strong> Opciones para cambiar el tema (claro/oscuro) y guardar preferencias.</li>
+        </ul>
+      </div>
+
+      <div style="text-align: center; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border); margin-top: 2rem;">
+        <p style="margin: 0; color: var(--text-light); font-size: 0.9rem;">
+          <strong>💡 Consejo:</strong> Siempre revisa esta pestaña para estar al tanto de las últimas novedades y mejoras en tu sistema financiero.
+        </p>
+      </div>
+    </section> <!-- CIERRE DE LA PESTAÑA CAMBIOS -->
+  </div>
 </div>
 
+<!-- ✅ NUEVA PESTAÑA: TASAS BCV -->
+<div class="side-content" id="side-tasas-bcv">
+  <div class="sidebar-content">
+    <section>
+      <h2>🏦 Tasas BCV del Día
+        <button onclick="mostrarAyudaBCV()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funcionan las tasas BCV?">❓</button>
+      </h2>
+      <p style="color: var(--text-light); margin-bottom: 1rem;">
+        Consulta automáticamente las tasas oficiales del Banco Central de Venezuela (BCV) y mantenlas actualizadas en tu sistema.
+      </p>
 
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+        <h3 style="margin-top: 0; color: var(--primary);">💱 Tasas Actuales</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div style="text-align: center; padding: 1rem; background: var(--success-bg); border-radius: 8px;">
+            <div style="font-size: 0.8rem; color: var(--success-text); margin-bottom: 0.5rem;">Dólar Oficial (BCV)</div>
+            <div id="tasaBCV" style="font-size: 1.5rem; font-weight: 600; color: var(--success);">--</div>
+            <div id="fechaBCV" style="font-size: 0.7rem; color: var(--success-text); margin-top: 0.25rem;">Actualizado: --</div>
+          </div>
+          
+          <div style="text-align: center; padding: 1rem; background: var(--info-bg); border-radius: 8px;">
+            <div style="font-size: 0.8rem; color: var(--info-text); margin-bottom: 0.5rem;">Euro Oficial (BCV)</div>
+            <div id="tasaBCVEUR" style="font-size: 1.5rem; font-weight: 600; color: var(--info);">--</div>
+            <div id="fechaBCVEUR" style="font-size: 0.7rem; color: var(--info-text); margin-top: 0.25rem;">Actualizado: --</div>
+          </div>
+        </div>
 
+        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+          <button onclick="obtenerTasasBCV()" style="flex: 1; background: #0b57d0; color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem;">
+            🔄 Actualizar Tasas
+          </button>
+          <button onclick="usarTasaBCV()" style="flex: 1; background: #018642; color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem;">
+            💱 Usar en Sistema
+          </button>
+          <button onclick="limpiarHistorialBCV()" style="flex: 1; background: #ff9800; color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem;">
+            🗑️ Limpiar Historial
+          </button>
+        </div>
 
-    <div class="side-content" id="side-config">
-      <section id="panelReglas">
-        <h2>Reglas de automatización</h2>
+        <div style="background: var(--warning-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--warning);">
+          <p style="margin: 0; color: var(--warning-text); font-size: 0.85rem;">
+            <strong>⚠️ Nota:</strong> Las tasas se obtienen directamente del sitio oficial del BCV. 
+            Se recomienda verificar la información en la fuente oficial.
+          </p>
+        </div>
+      </div>
+
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius);">
+        <h3 style="margin-top: 0; color: var(--text);">📊 Historial de Tasas</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem; font-size: 0.85rem;">
+          Últimas 7 tasas consultadas para seguimiento:
+        </p>
+        <div id="historialTasas" style="max-height: 200px; overflow-y: auto;">
+          <p style="text-align: center; color: var(--text-light); font-style: italic;">No hay historial aún. Consulta algunas tasas.</p>
+        </div>
+      </div>
+    </section> <!-- CIERRE SECCIÓN TASAS BCV -->
+  </div>
+</div>
+
+<div class="side-content" id="side-config">
+  <div class="sidebar-content">
+    <section id="panelReglas">
+
+      <div style="text-align: center; margin-bottom: 1.5rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--text-light);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--text);">Sistema de Gestión Financiera</h3>
+        <p style="margin: 0; font-size: 0.875rem; color: var(--text-light);">
+            Versión <span id="versionConfig" style="font-weight: 600; color: var(--primary);">1.1.2</span>
+        </p>
+      </div>
+
+      <h2>Ajustes del sistema 
+        <button onclick="mostrarAyudaConfiguracion()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo configurar reglas y categorías?">❓</button>
+    </h2>
+
         <ul id="listaReglas"></ul>
 
         <!-- ✅ NUEVA SECCIÓN: Editar Categorías -->
@@ -449,6 +1295,7 @@
     <button onclick="agregarBanco()" style="margin-top: 0.5rem; width:100%;">➕ Nuevo banco</button>
   </details>
 
+        <!-- ELIMINAR CATEGORÍAS -->
         <details>
           <summary>🗑️ Eliminar categoría</summary>
           <select id="selectEliminarCategoria">
@@ -456,6 +1303,8 @@
           </select>
           <button onclick="eliminarCategoria()">Eliminar</button>
         </details>
+
+        <!-- ELIMINAR BANCOS -->
         <details>
           <summary>🗑️ Eliminar banco</summary>
           <select id="selectEliminarBanco">
@@ -463,10 +1312,14 @@
           </select>
           <button onclick="eliminarBanco()">Eliminar</button>
         </details>
+
+        <!-- ELIMINAR SALDO INICIAL -->
         <details>
           <summary>🗑️ Eliminar saldo inicial</summary>
           <button onclick="eliminarSaldoInicial()">Eliminar saldo inicial</button>
         </details>
+
+        <!-- NUEVA REGLA -->
         <details>
           <summary>➕ Nueva regla</summary>
           <input type="text" id="txtPalabra" placeholder="Palabra clave (ej. netflix)" />
@@ -481,48 +1334,168 @@
           <button onclick="agregarRegla()">Guardar regla</button>
         </details>
 
-              <details style="margin-top: 1.5rem;">
-        <summary>🔒 Bloqueo de App (PIN)</summary>
-        <p style="color: var(--text-light); margin-bottom: 1rem;">
-          Activa un bloqueo con PIN para proteger tu app. Solo tú podrás acceder.
-        </p>
-        <div style="margin-bottom: 1rem;">
-          <label>
-            <input type="checkbox" id="bloqueoActivo" />
-            Activar bloqueo de app
-          </label>
-        </div>
-        <div id="bloqueoPINContainer" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--text-light);">
-          <label for="bloqueoPIN">Ingresa tu PIN de 4 dígitos:</label>
-          <input type="password" id="bloqueoPIN" maxlength="4" minlength="4" placeholder="Ej: 1234" style="width:100%; margin-bottom:0.75rem;" />
-          <label for="bloqueoPINConfirmar">Confirma tu PIN:</label>
-          <input type="password" id="bloqueoPINConfirmar" maxlength="4" minlength="4" placeholder="Vuelve a ingresar" style="width:100%; margin-bottom:0.75rem;" />
-          <button onclick="guardarPIN()" style="width:100%;">Guardar PIN</button>
-          <button onclick="eliminarPIN()" style="width:100%; background:var(--danger); margin-top:0.5rem;">Eliminar PIN</button>
-        </div>
-        <p style="font-size:0.8rem; color:var(--text-light); margin-top:1rem;">
-          ⚠️ Si olvidas tu PIN, no podrás acceder a tu app. <br>
-          ¡Guarda tu PIN en un lugar seguro!
-        </p>
-      </details>
+              <!-- BLOQUEO DE SEGURIDAD -->
+<details style="margin-top: 1.5rem;">
+  <summary>🔒 Bloqueo de App (PIN)</summary>
+  <p style="color: var(--text-light); margin-bottom: 1rem;">Activa un bloqueo con PIN para proteger tu app. Solo tú podrás acceder.</p>
+  <div style="margin-bottom: 1rem;">
+    <label><input type="checkbox" id="bloqueoActivo" />Activar bloqueo de app</label>
+  </div>
 
-      <details style="margin-top: 1.5rem;">
+  <div id="bloqueoPINContainer" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--text-light);">
+    <label for="bloqueoPIN">Ingresa tu PIN de 4 dígitos:</label>
+    <input type="password" id="bloqueoPIN" maxlength="4" minlength="4" placeholder="Ej: 1234" style="width:100%; margin-bottom:0.75rem;" />
+    <label for="bloqueoPINConfirmar">Confirma tu PIN:</label>
+    <input type="password" id="bloqueoPINConfirmar" maxlength="4" minlength="4" placeholder="Vuelve a ingresar" style="width:100%; margin-bottom:0.75rem;" />
+
+    <!-- Preguntas de Seguridad -->
+    <div style="margin-top: 1rem; padding: 1rem; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border);">
+      <h4 style="margin: 0 0 0.75rem 0; color: var(--text);">🔐 Preguntas de Seguridad</h4>
+      <p style="color: var(--text-light); margin-bottom: 1rem; font-size: 0.9rem;">Establece 2 preguntas de seguridad para recuperar tu acceso si olvidas tu PIN.</p>
+
+      <div style="margin-bottom: 1rem;">
+        <label for="preguntaSeguridad1">Pregunta 1:</label>
+        <select id="preguntaSeguridad1" style="width:100%; margin-bottom:0.75rem; padding:0.5rem; border:1px solid #ccc; border-radius:6px;">
+          <option value="">Selecciona una pregunta</option>
+          <option value="nombreMadre">Nombre de tu madre</option>
+          <option value="nombrePadre">Nombre de tu padre</option>
+          <option value="nombreMascota">Nombre de tu primera mascota</option>
+          <option value="ciudadNatal">Ciudad donde naciste</option>
+          <option value="mejorAmigo">Nombre de tu mejor amigo/a de la infancia</option>
+          <option value="primeraEscuela">Nombre de tu primera escuela</option>
+          <option value="comidaFavorita">Tu comida favorita</option>
+        </select>
+        <input type="text" id="respuestaSeguridad1" placeholder="Respuesta" style="width:100%; margin-bottom:0.75rem; padding:0.5rem; border:1px solid #ccc; border-radius:6px;" />
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label for="preguntaSeguridad2">Pregunta 2:</label>
+        <select id="preguntaSeguridad2" style="width:100%; margin-bottom:0.75rem; padding:0.5rem; border:1px solid #ccc; border-radius:6px;">
+          <option value="">Selecciona una pregunta</option>
+          <option value="nombreMadre">Nombre de tu madre</option>
+          <option value="nombrePadre">Nombre de tu padre</option>
+          <option value="nombreMascota">Nombre de tu segunda mascota</option>
+          <option value="ciudadNatal">Ciudad donde naciste</option>
+          <option value="mejorAmigo">Nombre de tu mejor amigo/a de la infancia</option>
+          <option value="primeraEscuela">Nombre de tu primera escuela</option>
+          <option value="comidaFavorita">Tu comida favorita</option>
+        </select>
+        <input type="text" id="respuestaSeguridad2" placeholder="Respuesta" style="width:100%; margin-bottom:0.75rem; padding:0.5rem; border:1px solid #ccc; border-radius:6px;" />
+      </div>
+    </div>
+
+    <button onclick="guardarPIN()" style="width:100%;">Guardar PIN y Preguntas de Seguridad</button>
+    <button onclick="eliminarPIN()" style="width:100%; background:var(--danger); margin-top:0.5rem;">Eliminar PIN</button>
+  </div>
+  <p style="font-size:0.8rem; color:var(--text-light); margin-top:1rem;">⚠️ Si olvidas tu PIN, puedes usar las preguntas de seguridad para recuperar el acceso. <br>¡Guarda tus respuestas en un lugar seguro!</p>
+</details>
+
+      <!-- COPIA DE SEGURIDAD -->
+<details style="margin-top: 1.5rem;">
   <summary>💾 Copia de Seguridad</summary>
   <p style="color: var(--text-light); margin-bottom: 1rem;">
     Exporta o importa tu historial completo. Ideal para cambiar de dispositivo o recuperar datos.
   </p>
-  <button onclick="exportarBackup()" style="width:100%; padding:1rem; margin-bottom:0.75rem; background:#0b57d0; color:white; border:none; border-radius:8px; font-size:1rem;">
-    📤 Exportar Backup
-  </button>
-  <button onclick="importarBackup()" style="width:100%; padding:1rem; background:#018642; color:white; border:none; border-radius:8px; font-size:1rem;">
-    📥 Importar Backup
-  </button>
+  
+  <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+    <button onclick="exportarBackup()" style="flex: 1; padding: 1rem; background: #0b57d0; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+      <span style="font-size: 1.2rem;">📤</span> Exportar
+    </button>
 
-  <button onclick="repararApp()" style="width:100%; padding:1rem; margin-top:1rem; background:#ff9800; color:white; border:none; border-radius:8px; font-size:1rem;">
-    🛠️ Reparar Visualización (Firefox/Chrome)
+    <button onclick="exportarRespaldoTotal()" style="flex: 1; padding: 1rem; background: #0d9488; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+      <span style="font-size: 1.2rem;">🛡️</span> Exportación Total
+    </button>
+
+<!-- ✅ Botón para guardar el backup localmente -->
+<button onclick="guardarBackupActual()" style="flex: 1; padding: 1rem; background: #6d28d9; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+    <span style="font-size: 1.2rem;">💾</span> Guardar
+</button>
+
+    <!-- ✅ NUEVO: Campo para nombre personalizado del backup -->
+<div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+    <label for="nombreBackup">Nombre del Backup:</label>
+    <input type="text" id="nombreBackup" placeholder="Ej: Backup Finanzas Empresa X" style="flex: 1; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;" />
+</div>
+
+    <button onclick="importarBackupDesdeDisco()" 
+      style="flex: 1; padding: 1rem; background: #018642; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+      <span style="font-size: 1.2rem;">📥</span> Importar desde Disco
   </button>
+  </div>
+  
+  
+  <!-- Sección de Backups Guardados -->
+  <div style="margin-top: 1.5rem;">
+    <h4 style="margin-bottom: 0.75rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+      <span style="font-size: 1.2rem;">📂</span> Backups Guardados
+      <button onclick="cargarBackupsGuardados()" style="margin-left: auto; background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem; font-size: 0.9rem;">
+        <span style="font-size: 1rem;">🔄</span> Actualizar
+      </button>
+    </h4>
+    
+    <div id="listaBackups" style="background: var(--card-bg); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color);">
+      <p style="text-align: center; color: var(--text-light);">Cargando backups guardados...</p>
+    </div>
+    
+    <p style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem; text-align: center;">
+      Los backups se guardan localmente en tu navegador.
+    </p>
+  </div>
+
+  <button onclick="repararApp()" style="width:100%; padding:1rem; margin-top:1.5rem; background:#ff9800; color:white; border:none; border-radius:8px; font-size:1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+    <span style="font-size: 1.2rem;">🛠️</span> Reparar Visualización (Firefox/Chrome)
+  </button>
+</details>
+
+  <!-- MODO DE ENTRADA -->
+  <details style="margin-top: 1.5rem;">
+  <summary>🔢 Modo de Entrada de Números</summary>
+  <p style="color: var(--text-light); margin-bottom: 1rem;">
+    Elige cómo deseas ingresar cantidades en los campos de "Cantidad" y "Saldo Inicial".
+  </p>
+  <div style="margin-bottom: 1rem;">
+    <label>
+      <input type="radio" name="numeroModo" value="automatico" id="modoAutomatico" checked />
+      <strong>✅ Automático (recomendado)</strong><br>
+      <small>El sistema convierte automáticamente: <code>110.88</code> → <code>11.088,00</code></small>
+    </label>
+  </div>
+  <div style="margin-bottom: 1rem;">
+    <label>
+      <input type="radio" name="numeroModo" value="literal" id="modoLiteral" />
+      <strong>📝 Literal (ingresa tal cual)</strong><br>
+      <small>Guarda exactamente lo que escribas: <code>110.88</code> → <code>110.88</code> (sin formateo)</small>
+    </label>
+  </div>
+  <p style="font-size:0.8rem; color:var(--text-light); margin-top:0.75rem;">
+    ⚠️ En modo literal, no se aplicará formateo ni validación automática.  
+    Asegúrate de usar solo puntos (.) como separador decimal, y no comas (,).
+  </p>
+</details>
+
+  <!-- CONTROL DE SONIDOS -->
+  <details style="margin-top: 1.5rem;">
+    <summary>🔊 Control de Sonidos</summary>
+    <p style="color: var(--text-light); margin-bottom: 1rem;">
+      Activa o desactiva los sonidos que se reproducen al cambiar de pestañas. Puedes cambiar esta opción en cualquier momento.
+    </p>
+    <div style="margin-bottom: 1rem;">
+      <label>
+        <input type="checkbox" id="sonidosActivados" checked />
+        <strong>🔊 Sonidos activados</strong><br>
+        <small style="color: var(--text-light);">Reproduce sonidos sutiles al cambiar entre pestañas</small>
+      </label>
+    </div>
+    <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+      <button onclick="probarSonido()" style="flex: 1; background: #0b57d0; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;">🔊 Probar sonido</button>
+      <button onclick="guardarConfiguracionSonidos()" style="flex: 1; background: #018642; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;">💾 Guardar</button>
+    </div>
+    <p style="font-size:0.8rem; color:var(--text-light); margin-top:1rem;">
+      💡 Los sonidos usan la Web Audio API de tu navegador y no requieren archivos externos.
+    </p>
   </details>
-
+  
+  <!-- ELIMINAR TODOS LOS MOVIMIENTOS -->
   <details style="margin-top: 1.5rem; color: #b00020;">
   <summary style="color: #b00020;">⚠️ Eliminar todos los movimientos</summary>
   <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:0.75rem;">
@@ -535,29 +1508,1046 @@
   </button>
 </details>
 
-      </section>
-    </div>
+</section>
+</div> <!-- cierre sidebar-content CONFIGURACIÓN -->
+</div>
+
+
+<!-- ✅ NUEVA PESTAÑA: AHORRO -->
+<div class="side-content" id="side-ahorro">
+  <div class="sidebar-content">
+    <section>
+      <h2>🎯 Mis Metas de Ahorro
+        <button onclick="mostrarAyudaAhorro()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funciona esta pestaña?">❓</button>
+      </h2>
+      
+      <!-- FORMULARIO PARA NUEVA META -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+        <h3 style="margin-top: 0; color: var(--primary);">➕ Nueva Meta</h3>
+        <input type="text" id="nombreMeta" placeholder="Ej: Vacaciones en la playa 2025" 
+               style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        <input type="text" id="montoMeta" placeholder="Ej: 50000" 
+               style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        <input type="date" id="fechaMeta" 
+               style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        <button onclick="crearMetaAhorro()" 
+                style="width: 100%; background: #10B981; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem;">
+          💾 Crear Meta
+        </button>
+      </div>
+
+      <!-- LISTA DE METAS -->
+      <div id="listaMetasAhorro">
+        <!-- Las metas se cargarán aquí -->
+      </div>
+
+      <!-- GRÁFICO TERMÓMETRO -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-top: 2rem;">
+        <h3>📊 Progreso General</h3>
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+          <div style="flex: 1;">
+            <div style="height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 0.5rem;">
+              <div id="barraProgresoGeneral" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10B981, #059669); transition: width 0.5s ease;"></div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-light);">
+              <span id="textoProgresoGeneral">Bs. 0 / Bs. 0 (0%)</span>
+            </div>
+          </div>
+          <div style="font-size: 2rem;">🌡️</div>
+        </div>
+      </div>
+
+      <!-- SUGERENCIAS AUTOMÁTICAS -->
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: var(--radius); margin-top: 2rem; color: white;">
+        <h3 style="margin-top: 0;">💡 Sugerencias de Ahorro</h3>
+        <div id="sugerenciasContainer">
+          <p style="margin: 0; font-style: italic;">Cargando sugerencias...</p>
+        </div>
+        <button onclick="generarNuevasSugerencias()" 
+                style="margin-top: 1rem; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 6px; padding: 0.5rem 1rem; font-size: 0.9rem;">
+          🔄 Generar Nuevas
+        </button>
+      </div>
+    </section> <!-- Fin sección Ahorro -->
+  </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: OPTIMIZACIÓN FISCAL -->
+<div class="side-content" id="side-optimizacion-fiscal">
+  <div class="sidebar-content">
+    <section>
+      <h2>💰 Optimización Fiscal Simplificada
+        <button onclick="mostrarAyudaOptimizacionFiscal()" 
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funciona la optimización fiscal?">❓</button>
+      </h2>
+      <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+        Maximiza beneficios fiscales dentro del marco legal con herramientas profesionales automáticas.
+      </p>
+
+      <!-- CLASIFICADOR AUTOMÁTICO DE GASTOS DEDUCIBLES -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+        <h3>🔍 Clasificador Automático de Gastos Deducibles</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem;">
+          Analiza automáticamente tus movimientos para identificar gastos potencialmente deducibles.
+        </p>
+        <button onclick="clasificarGastosDeducibles()" 
+                style="background: #059669; color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer;">
+          🔍 Analizar Movimientos
+        </button>
+        <div id="resultadoClasificacion" style="margin-top: 1rem; display: none;">
+          <div style="background: var(--success-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--success);">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--success-text);">📊 Resultados del Análisis</h4>
+            <div id="resumenDeducibles" style="font-size: 0.9rem; color: var(--success-text);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMULADOR DE ESCENARIOS FISCALES -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+        <h3>📊 Simulador de Escenarios Fiscales</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem;">
+          Simula diferentes escenarios fiscales para optimizar tu estrategia tributaria.
+        </p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div>
+            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Ingresos Anuales Proyectados (Bs):</label>
+            <input type="text" id="ingresosProyectados" placeholder="Ej: 500000" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Gastos Deducibles Proyectados (Bs):</label>
+            <input type="text" id="gastosDeduciblesProyectados" placeholder="Ej: 150000" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px;">
+          </div>
+        </div>
+
+        <button onclick="simularEscenarioFiscal()" 
+                style="width: 100%; background: #0b57d0; color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 1rem; cursor: pointer;">
+          📊 Simular Escenario
+        </button>
+
+        <div id="resultadoSimulacion" style="margin-top: 1rem; display: none;">
+          <div style="background: var(--primary-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--primary);">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--primary);">📈 Resultado de Simulación</h4>
+            <div id="detalleSimulacion" style="font-size: 0.9rem; color: var(--text);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROYECCIÓN DE IMPUESTO ANUAL -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+        <h3>📈 Proyección de Impuesto Anual</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem;">
+          Proyecta tu impuesto anual basado en tendencias actuales de ingresos y gastos.
+        </p>
+        <button onclick="proyectarImpuestoAnual()" 
+                style="background: #ff9800; color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer;">
+          📊 Calcular Proyección
+        </button>
+        <div id="resultadoProyeccion" style="margin-top: 1rem; display: none;">
+          <div style="background: var(--warning-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--warning);">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--warning-text);">💰 Proyección Anual Estimada</h4>
+            <div id="detalleProyeccion" style="font-size: 0.9rem; color: var(--warning-text);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTIMIZACIÓN DE DEDUCCIONES -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+        <h3>🎯 Optimización de Deducciones</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem;">
+          Identifica oportunidades para maximizar deducciones fiscales legales.
+        </p>
+        <button onclick="optimizarDeducciones()" 
+                style="background: #8B5CF6; color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer;">
+          🎯 Optimizar Deducciones
+        </button>
+        <div id="resultadoOptimizacion" style="margin-top: 1rem; display: none;">
+          <div style="background: var(--secondary-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--secondary);">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--secondary);">💡 Oportunidades de Optimización</h4>
+            <div id="detalleOptimizacion" style="font-size: 0.9rem; color: var(--text);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECOMENDACIONES DE TIMING -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+        <h3>⏰ Recomendaciones de Timing de Gastos</h3>
+        <p style="color: var(--text-light); margin-bottom: 1rem;">
+          Sugerencias sobre cuándo realizar gastos para maximizar beneficios fiscales.
+        </p>
+        <button onclick="generarRecomendacionesTiming()" 
+                style="background: #10B981; color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-size: 1rem; cursor: pointer;">
+          ⏰ Generar Recomendaciones
+        </button>
+        <div id="resultadoTiming" style="margin-top: 1rem; display: none;">
+          <div style="background: var(--info-bg); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--info);">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--info-text);">📅 Recomendaciones de Timing</h4>
+            <div id="detalleTiming" style="font-size: 0.9rem; color: var(--info-text);"></div>
+          </div>
+        </div>
+      </div>
+    </section> <!-- Fin sección Optimización Fiscal -->
+  </div>
+</div>
+
+<!-- ======= PESTAÑA: RECORDATORIOS ======= -->
+<div class="side-content" id="side-recordatorios">
+  <div class="sidebar-content">
+    <section>
+      <h2>⏰ Recordatorios
+        <button onclick="mostrarAyudaRecordatorios()"
+                style="background:none;border:none;color:var(--primary);font-size:1rem;cursor:pointer;margin-left:0.5rem;padding:0.25rem;border-radius:50%;"
+                title="¿Cómo funcionan los recordatorios?">❓</button>
+      </h2>
+      <p style="color:var(--text-light);margin-bottom:1.5rem;">
+        Gestiona avisos automáticos para vencimientos, metas o cualquier evento.  
+        <strong>Anticipación por defecto: 5 días</strong> (personalizable).
+      </p>
+
+      <!-- Formulario nuevo recordatorio -->
+      <div style="background:var(--card-bg);padding:1.5rem;border-radius:var(--radius);margin-bottom:1.5rem;">
+        <h3 style="margin-top:0;">➕ Nuevo Recordatorio</h3>
+        <input type="text" id="tituloRecordatorio" placeholder="Título (ej: Pago del mantenimiento)" 
+               style="width:100%;margin-bottom:1rem;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+        <textarea id="descripcionRecordatorio" placeholder="Descripción opcional..." rows="2"
+                  style="width:100%;margin-bottom:1rem;padding:0.75rem;border:1px solid #ccc;border-radius:8px;resize:vertical;"></textarea>
+        <label>Fecha límite:
+          <input type="date" id="fechaRecordatorio" style="width:100%;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+        </label>
+        <label style="margin-top:1rem;display:block;">
+          Anticipación (días):
+          <input type="number" id="diasAnticipacion" value="5" min="1" max="365"
+                 style="width:100%;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+        </label>
+        
+        <!-- Nuevo campo para repetición en el mismo día -->
+        <label style="margin-top:1rem;display:block;">
+          <input type="checkbox" id="repetirMismoDia" onchange="toggleRepeticionMismoDia()"
+                 style="transform:scale(1.2);accent-color:var(--primary);margin-right:0.5rem;">
+          Repetir aviso en el mismo día cada:
+        </label>
+        <div id="intervaloRepeticionContainer" style="margin-top:0.5rem;margin-left:1.5rem;display:none;">
+          <input type="number" id="intervaloMinutos" value="30" min="1" max="1440" 
+                 placeholder="Minutos"
+                 style="width:100%;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+          <small style="color:var(--text-light);display:block;margin-top:0.25rem;">
+            El aviso se repetirá cada X minutos todos los días dentro del rango de anticipación
+          </small>
+        </div>
+        
+        <button onclick="guardarRecordatorio()" 
+                style="width:100%;margin-top:1rem;background:var(--primary);color:white;border:none;border-radius:8px;padding:0.75rem;">Guardar</button>
+
+        <label style="margin-top:1rem;display:block;">
+  Prioridad:
+  <select id="prioridadRecordatorio" style="width:100%;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+    <option value="baja">Baja</option>
+    <option value="media" selected>Media</option>
+    <option value="alta">Alta</option>
+  </select>
+</label>
+
+<label style="margin-top:1rem;display:block;">
+  Repetición:
+  <select id="repeticionRecordatorio" style="width:100%;padding:0.75rem;border:1px solid #ccc;border-radius:8px;">
+    <option value="ninguna" selected>No repetir</option>
+    <option value="diaria">Diaria</option>
+    <option value="semanal">Semanal</option>
+    <option value="mensual">Mensual</option>
+  </select>
+</label>
+      </div>
+
+<!------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------>      
+      <!-- ⚙️ Configuración global -->
+<details style="margin-bottom:1.5rem;">
+  <summary>⚙️ Configuración global</summary>
+
+  <div style="padding:1rem;background:var(--card-bg);border-radius:var(--radius);display:flex;flex-direction:column;gap:1rem;">
+    
+    <!-- 🔔 Sonido de aviso -->
+    <section id="configSonido">
+      <h5 style="margin-top:0;">🔔 Sonido de aviso</h5>
+
+      <label for="selectSonido">Elegir sonido:</label>
+      <select id="selectSonido" style="margin-top:0.3rem;">
+        <option value="default">Predeterminado</option>
+        <option value="chime">Campanita</option>
+        <option value="alert">Alerta breve</option>
+        <option value="none">Silencio</option>
+      </select>
+
+      <div style="margin-top:0.6rem;">
+        <label for="uploadSonido">O subir un sonido personalizado (.mp3 o .wav):</label>
+        <input type="file" id="uploadSonido" accept="audio/*" style="margin-top:0.3rem;">
+      </div>
+
+      <button id="btnProbarSonido"
+              style="margin-top:0.7rem;background:var(--info);color:white;border:none;border-radius:6px;padding:0.4rem 0.8rem;">
+        ▶️ Probar sonido
+      </button>
+    </section>
+
+    <!-- 🕓 Configuración visual / avisos -->
+<section id="configVisual">
+  <h5 style="margin-top:1rem; margin-bottom:0.5rem;">👁️ Preferencias de avisos</h5>
+  
+  <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.3rem;">
+    <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;">
+      <input type="checkbox" id="mostrarToast" checked onchange="toggleAvisosVisuales()" 
+             style="transform:scale(1.2);accent-color:var(--info);">
+      <span>Mostrar notificaciones visuales (toasts)</span>
+    </label>
+
+    <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;">
+      <input type="checkbox" id="mostrarVencidos" checked onchange="toggleVencidos()" 
+             style="transform:scale(1.2);accent-color:var(--warning);">
+      <span>Mostrar recordatorios vencidos en la lista</span>
+    </label>
   </div>
 
-  <script src="chart.umd.min.js?v=20250420"></script>
-  <script src="xlsx.full.min.js?v=20250420"></script>
-  <script src="app.js?v=20250420"></script>
+  <div style="display:flex;flex-direction:column;gap:0.3rem;margin-top:0.8rem;">
+  <label for="modoAvisoDiario" style="font-weight:500;">🔁 Modo de recordatorio:</label>
+  <select id="modoAvisoDiario" onchange="guardarModoAvisoDiario()" style="padding:0.3rem;border-radius:6px;">
+    <option value="unico">Avisar una sola vez</option>
+    <option value="repetido">Recordar cada día hasta la fecha límite</option>
+  </select>
+</div>
 
-  <!-- Modal de bloqueo -->
-  <div id="modalBloqueo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1001; justify-content:center; align-items:center;">
+</section>
+
+
+    <!-- 💾 Botón de respaldo opcional -->
+    <section id="configBackup">
+      <h5 style="margin-top:1rem;">💾 Respaldo y restauración</h5>
+      <button onclick="exportarRecordatorios()" 
+              style="background:var(--success);color:white;border:none;border-radius:6px;padding:0.4rem 0.8rem;">
+        Exportar recordatorios
+      </button>
+      <input type="file" id="importarArchivo" accept=".json" onchange="importarRecordatorios(this)" 
+             style="margin-top:0.5rem;">
+    </section>
+
+  </div>
+</details>
+
+<!------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------>
+
+      <!-- Listado de recordatorios -->
+      <div id="listaRecordatorios" style="margin-bottom:1.5rem;">
+        <!-- Se llena dinámicamente -->
+      </div>
+
+      <!-- Próximos avisos -->
+      <div id="proximosAvisos" style="margin-bottom:1.5rem;">
+        <h3>📬 Próximos avisos</h3>
+        <ul id="ulProximosAvisos"></ul>
+      </div>
+    </section> <!-- CIERRE DE SECCIÓN RECORDATORIOS -->
+  </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: NOTAS -->
+<div class="side-content" id="side-notas">
+    <div class="sidebar-content">
+        <section>
+            <h2>📝 Notas<button onclick="mostrarAyudaNotas()" style="background:none;border:none;color:var(--primary);font-size:1rem;cursor:pointer;margin-left:0.5rem;padding:0.25rem;border-radius:50%;" title="¿Cómo usar las notas?">❓</button></h2>
+            <p style="color:var(--text-light);margin-bottom:1.5rem;">Escribe y guarda tus ideas, recordatorios o cualquier información importante.</p>
+
+            <!-- Formulario para agregar/editar notas -->
+            <div id="formularioNota" style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <input type="hidden" id="idNotaEditando" value="">
+                <label for="tituloNota">Título:</label>
+                <input type="text" id="tituloNota" placeholder="Ej: Ideas para el presupuesto" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="contenidoNota">Contenido:</label>
+                <textarea id="contenidoNota" placeholder="Escribe aquí tu nota..." style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem; min-height:150px; resize:vertical;"></textarea>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="guardarNota()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">💾 Guardar Nota</button>
+                    <button onclick="limpiarFormularioNota()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🗑️ Limpiar</button>
+                </div>
+            </div>
+
+            <!-- Lista de notas -->
+            <div id="listaNotas" style="margin-top:1.5rem;">
+                <h3>📋 Tus Notas</h3>
+                <div id="contenedorNotas" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                    <!-- Las notas se cargarán dinámicamente aquí -->
+                </div>
+                <div id="mensajeSinNotas" style="text-align: center; padding: 2rem; color: var(--text-light); display: none;">
+                    <p>📭 No tienes notas aún.</p>
+                    <p>Escribe algo en el formulario de arriba para empezar.</p>
+                </div>
+            </div>
+        </section> <!-- Cierre de la sección de Notas -->
+    </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: PRESUPUESTO SUGERIDO -->
+<div class="side-content" id="side-presupuesto-sugerido">
+  <div class="sidebar-content">
+    <section>
+      <h2>💰 Presupuesto Sugerido
+        <button onclick="mostrarAyudaPresupuestoSugerido()"
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo funciona el presupuesto sugerido?">❓</button>
+      </h2>
+      <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+        Basado en tu historial de gastos, te sugerimos un presupuesto mensual inteligente que te ayude a cubrir todos tus gastos con éxito.
+      </p>
+
+      <!-- ✅ BOTÓN PARA GENERAR PRESUPUESTO SUGERIDO -->
+      <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; border-left: 4px solid var(--primary);">
+        <h3 style="margin-top: 0; color: var(--primary);">🎯 Generar Presupuesto Sugerido</h3>
+        <p style="color: var(--text-light); margin-bottom: 1.5rem; font-size: 0.9rem;">
+          Analizaremos tus gastos históricos y te sugeriremos un presupuesto mensual optimizado.
+        </p>
+        <button onclick="generarPresupuestoSugerido()" id="btnGenerarPresupuesto"
+                style="width: 100%; background: var(--primary); color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem; cursor: pointer; transition: background 0.2s;">
+          🔄 Generar Presupuesto Sugerido
+        </button>
+      </div>
+
+      <!-- ✅ RESULTADOS DEL PRESUPUESTO SUGERIDO -->
+      <div id="resultadosPresupuesto" style="display: none;">
+        <!-- Resumen Ejecutivo -->
+        <div style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+          <h3 style="margin-top: 0; display: flex; align-items: center; gap: 0.5rem;">
+            📊 Resumen Ejecutivo
+          </h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 1.5rem; font-weight: bold; color: #10B981;">💰</div>
+              <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Gasto Promedio Mensual</p>
+              <p style="font-size: 1.2rem; font-weight: bold;" id="gastoPromedioMensual">Bs. 0,00</p>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 1.5rem; font-weight: bold; color: #F59E0B;">📈</div>
+              <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Presupuesto Sugerido</p>
+              <p style="font-size: 1.2rem; font-weight: bold;" id="presupuestoSugerido">Bs. 0,00</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ ANÁLISIS DETALLADO POR CATEGORÍAS -->
+        <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem;">
+          <h3 style="margin-top: 0; color: var(--text);">📋 Análisis por Categorías</h3>
+          <div id="analisisCategorias">
+            <!-- Las categorías se cargarán dinámicamente aquí -->
+          </div>
+        </div>
+
+        <!-- ✅ ACCIONES RECOMENDADAS -->
+        <div style="background: var(--success-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 2rem; border-left: 4px solid var(--success);">
+          <h3 style="margin-top: 0; color: var(--success-text);">✅ Acciones Recomendadas</h3>
+          <div id="accionesRecomendadas">
+            <!-- Las acciones se cargarán dinámicamente aquí -->
+          </div>
+        </div>
+
+        <!-- ✅ BOTONES DE ACCIÓN -->
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+          <button onclick="aplicarPresupuestoSugerido()" id="btnAplicarPresupuesto"
+                  style="flex: 1; background: var(--success); color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem; cursor: pointer; transition: background 0.2s;">
+            ✅ Aplicar como Meta
+          </button>
+          <button onclick="exportarPresupuestoSugerido()" id="btnExportarPresupuesto"
+                  style="flex: 1; background: var(--info); color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem; cursor: pointer; transition: background 0.2s;">
+            📄 Exportar PDF
+          </button>
+        </div>
+
+        <!-- ✅ AJUSTES MANUALES -->
+        <div style="background: var(--warning-bg); padding: 1.5rem; border-radius: var(--radius); border-left: 4px solid var(--warning);">
+          <h3 style="margin-top: 0; color: var(--warning-text);">⚙️ Ajustes Manuales</h3>
+          <p style="color: var(--warning-text); margin-bottom: 1rem; font-size: 0.9rem;">
+            ¿No te convence alguna sugerencia? Ajusta manualmente las categorías:
+          </p>
+          <div id="ajustesCategorias">
+            <!-- Los controles de ajuste se cargarán dinámicamente aquí -->
+          </div>
+          <button onclick="guardarAjustesPresupuesto()" id="btnGuardarAjustes"
+                  style="width: 100%; background: var(--warning); color: white; border: none; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem; cursor: pointer; margin-top: 1rem;">
+            💾 Guardar Ajustes
+          </button>
+        </div>
+      </div>
+
+      <!-- ✅ ESTADO SIN DATOS -->
+      <div id="estadoSinDatos" style="text-align: center; padding: 3rem 1rem; color: var(--text-light);">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+        <h3 style="color: var(--text); margin-bottom: 1rem;">Sin datos suficientes</h3>
+        <p style="margin-bottom: 2rem;">
+          Necesitamos al menos 3 meses de datos de gastos para generar un presupuesto sugerido inteligente.
+        </p>
+        <p style="font-size: 0.9rem; color: var(--text-light);">
+          💡 <strong>Consejo:</strong> Agrega más movimientos históricos para obtener mejores sugerencias.
+        </p>
+      </div>
+
+            <!-- ✅ SECCIÓN DE CONFIGURACIÓN PERMANENTE -->
+            <div id="seccionConfiguracionPermanente" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--text-light);">
+              <h3 style="margin-top: 0; color: var(--primary);">⚙️ Configuración del Análisis</h3>
+              <p style="color: var(--text-light); margin-bottom: 1rem; font-size: 0.9rem;">
+                Personaliza cómo funciona el análisis de presupuesto sugerido.
+              </p>
+      
+              <div style="margin-bottom: 1.5rem;">
+                <h4 style="margin: 0 0 0.5rem 0; color: var(--text);">🔧 Configuración Personal</h4>
+                
+                <div style="margin-bottom: 1rem;">
+                  <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">
+                    Meses mínimos requeridos:
+                    <select id="selectMesesMinimosConfig" style="margin-left: 0.5rem; padding: 0.25rem; border-radius: 4px;">
+                      <option value="3">3 meses (recomendado)</option>
+                      <option value="2">2 meses</option>
+                      <option value="1">1 mes</option>
+                    </select>
+                  </label>
+                </div>
+      
+                <div style="margin-bottom: 1rem;">
+                  <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="checkExcepcionesConfig">
+                    <span>Permitir excepciones (generar con menos datos si es necesario)</span>
+                  </label>
+                </div>
+              </div>
+      
+              <div style="display: flex; gap: 1rem;">
+                <button onclick="aplicarConfiguracion()" 
+                        style="flex: 1; background: var(--success); color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem;">
+                  💾 Aplicar Configuración
+                </button>
+                <button onclick="restaurarConfiguracionPredeterminada()" 
+                        style="flex: 1; background: var(--info); color: white; border: none; border-radius: 8px; padding: 1rem; font-size: 1rem;">
+                  🔄 Restaurar Predeterminados
+                </button>
+              </div>
+            </div>
+
+    </section> <!-- CIERRE DE LA SECCIÓN PRESUPUESTO SUGERIDO -->
+  </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: PROVEEDORES Y PAGOS -->
+<div class="side-content" id="side-proveedores-pagos">
+    <div class="sidebar-content">
+        <section id="registroProveedor">
+            <h2>➕ Registrar Nuevo Pago<button onclick="mostrarAyudaProveedores()"
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo gestionar proveedores y pagos?">❓</button></h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">Registra los pagos que haces a tus proveedores, contratistas o servicios recurrentes.</p>
+
+            <!-- Formulario para registrar un nuevo pago -->
+            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <input type="hidden" id="idPagoEditando" value="">
+                <label for="nombreProveedor">Nombre del Proveedor:</label>
+                <input type="text" id="nombreProveedor" placeholder="Ej: Juan Pérez - Servicios IT" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="montoPago">Monto (Bs):</label>
+                <input type="text" id="montoPago" placeholder="Ej: 5.000,00" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="fechaPago">Fecha de Pago:</label>
+                <input type="date" id="fechaPago" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="metodoPago">Método de Pago:</label>
+                <select id="metodoPago" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="">Selecciona un método</option>
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="pago móvil">Otro</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="otro">Otro</option>
+                </select>
+                <label for="estadoPago">Estado:</label>
+                <select id="estadoPago" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="pagado">Pagado</option>
+                </select>
+                <label for="descripcionPago">Descripción (opcional):</label>
+                <textarea id="descripcionPago" placeholder="Detalles del servicio o contrato..." style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem; min-height:80px; resize:vertical;"></textarea>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="guardarPago()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">💾 Guardar Pago</button>
+                    <button onclick="limpiarFormularioPago()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🧹 Limpiar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="listaPagos">
+            <h2>📋 Mis Pagos</h2>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <select id="filtroEstadoPago" style="padding:0.5rem; border:1px solid #ccc; border-radius:6px; flex:1;">
+                    <option value="">Todos los estados</option>
+                    <option value="pendiente">Pendientes</option>
+                    <option value="pagado">Pagados</option>
+                </select>
+                <select id="filtroProveedor" style="padding:0.5rem; border:1px solid #ccc; border-radius:6px; flex:1;">
+                    <option value="">Todos los proveedores</option>
+                    <!-- Las opciones se cargarán dinámicamente -->
+                </select>
+            </div>
+            <div id="contenedorPagos" style="margin-top:1rem;">
+                <!-- Los pagos se cargarán dinámicamente aquí -->
+                <p style="text-align: center; color: var(--text-light);">No hay pagos registrados aún.</p>
+            </div>
+        </section>
+
+        <section id="graficoGastosProveedores">
+            <h2>📊 Gasto por Proveedor</h2>
+            <canvas id="graficoProveedores" style="max-width:100%; height:auto;"></canvas>
+        </section> <!-- CIERRE DE LA SECCIÓN PROVEEDORES Y PAGOS -->
+    </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: INVENTARIO / ACTIVOS -->
+<div class="side-content" id="side-inventario-activos">
+    <div class="sidebar-content">
+        <section id="registroActivo">
+            <h2>➕ Registrar Nuevo Activo<button onclick="mostrarAyudaInventario()"
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo gestionar inventario y activos?">❓</button></h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">Registra equipos, herramientas o cualquier activo con valor contable.</p>
+
+            <!-- Formulario para registrar un nuevo activo -->
+            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <input type="hidden" id="idActivoEditando" value="">
+                <label for="nombreActivo">Nombre del Activo:</label>
+                <input type="text" id="nombreActivo" placeholder="Ej: Computadora Portátil Dell" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="valorActivo">Valor Inicial (Bs):</label>
+                <input type="text" id="valorActivo" placeholder="Ej: 10.000,00" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="fechaCompra">Fecha de Compra:</label>
+                <input type="date" id="fechaCompra" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="depreciacionEstimada">Depreciación Estimada (% anual):</label>
+                <input type="number" id="depreciacionEstimada" placeholder="Ej: 10" min="0" max="100" step="0.01" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="descripcionActivo">Descripción (opcional):</label>
+                <textarea id="descripcionActivo" placeholder="Detalles del activo, modelo, serial, etc." style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem; min-height:80px; resize:vertical;"></textarea>
+                <label for="categoriaActivo">Categoría (opcional):</label>
+                <input type="text" id="categoriaActivo" placeholder="Ej: Equipos de Oficina, Herramientas, Vehículos" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="guardarActivo()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">💾 Guardar Activo</button>
+                    <button onclick="limpiarFormularioActivo()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🧹 Limpiar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="listaActivos">
+            <h2>📋 Mis Activos</h2>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                <select id="filtroEstadoActivo" style="padding:0.5rem; border:1px solid #ccc; border-radius:6px; flex:1;">
+                    <option value="">Todos los estados</option>
+                    <option value="activo">Activo</option>
+                    <option value="depreciado">Depreciado</option>
+                    <option value="vendido">Vendido</option>
+                </select>
+                <select id="filtroCategoriaActivo" style="padding:0.5rem; border:1px solid #ccc; border-radius:6px; flex:1;">
+                    <option value="">Todas las categorías</option>
+                    <!-- Las opciones se cargarán dinámicamente -->
+                </select>
+            </div>
+            <div id="contenedorActivos" style="margin-top:1rem;">
+                <!-- Los activos se cargarán dinámicamente aquí -->
+                <p style="text-align: center; color: var(--text-light);">No hay activos registrados aún.</p>
+            </div>
+        </section>
+
+        <section id="exportarInventario">
+            <h2>📄 Exportar Inventario</h2>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                <button onclick="exportarInventarioExcel()" style="flex:1; background:var(--success); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">📊 Exportar Excel</button>
+                <button onclick="exportarInventarioPDF()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">📄 Exportar PDF</button>
+            </div>
+        </section> <!-- Cierre de la sección Inventario y activos -->
+    </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: REPORTES GERENCIALES -->
+<div class="side-content" id="side-reportes-gerenciales">
+    <div class="sidebar-content">
+        <section id="filtroReporte">
+            <h2>⚙️ Configurar Reporte<button onclick="mostrarAyudaReportes()"
+                style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                title="¿Cómo configurar los reportes gerenciales?">❓</button></h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">Selecciona el período y las métricas que deseas incluir en tu reporte.</p>
+
+            <!-- Formulario para configurar el reporte -->
+            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <label for="periodoReporte">Período:</label>
+                <select id="periodoReporte" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="anual">Anual</option>
+                </select>
+                <label for="fechaInicioReporte">Fecha de Inicio:</label>
+                <input type="date" id="fechaInicioReporte" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="fechaFinReporte">Fecha de Fin:</label>
+                <input type="date" id="fechaFinReporte" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="metricasReporte">Métricas a incluir:</label>
+                <select id="metricasReporte" multiple style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem; height: 100px;">
+                    <option value="ingresosGastos" selected>Ingresos vs Gastos</option>
+                    <option value="topCategorias" selected>Top Categorías</option>
+                    <option value="rentabilidad" selected>Rentabilidad</option>
+                    <option value="comparativaMensual" selected>Comparativa Mensual</option>
+                </select>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="generarReporteGerencial()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">📊 Generar Reporte</button>
+                    <button onclick="limpiarConfiguracionReporte()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🧹 Limpiar</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="contenidoReporte" style="display: none;">
+            <h2>📈 Resultados del Reporte</h2>
+            <!-- Aquí se mostrará el contenido del reporte generado -->
+            <div id="contenedorReporte" style="margin-top:1rem;"></div>
+        </section>
+
+        <section id="exportarReporte">
+            <h2>📄 Exportar Reporte</h2>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                <button onclick="exportarReporteExcel()" style="flex:1; background:var(--success); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">📊 Exportar Excel</button>
+                <button onclick="exportarReportePDF()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">📄 Exportar PDF</button>
+            </div>
+        </section> <!-- Cierre de la sección Reportes Gerenciales -->
+    </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: EMPRESAS (SISTEMA MULTI-EMPRESA) -->
+<div class="side-content" id="side-empresas">
+    <div class="sidebar-content">
+        <!-- Selector de empresa activa -->
+        <section id="selectorEmpresaActivaSection" style="background: var(--card-bg); padding: 1rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <h2 style="margin: 0 0 0.75rem 0; color: var(--text);">🏢 Empresa Activa
+                <button onclick="mostrarAyudaEmpresas()" 
+                        style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                        title="¿Cómo funciona el sistema multi-empresa?">❓</button>
+            </h2>
+            <select id="selectorEmpresaActiva" onchange="cambiarEmpresaActiva()" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem;">
+                <option value="">Todas las empresas</option>
+            </select>
+            <p style="color: var(--text-light); font-size: 0.875rem; margin-top: 0.5rem;">
+                💡 Selecciona una empresa para filtrar todos los datos o "Todas las empresas" para ver todo consolidado.
+            </p>
+        </section>
+
+        <!-- Formulario para agregar/editar empresas -->
+        <section id="formularioEmpresa">
+            <h2>📝 Registrar Empresa
+                <button onclick="mostrarAyudaFormularioEmpresa()" 
+                        style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                        title="¿Qué campos son obligatorios?">❓</button>
+            </h2>
+            
+            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <label for="empresaNombre">Nombre de la empresa <span style="color: var(--danger);">*</span>:</label>
+                <input type="text" id="empresaNombre" placeholder="Ej: Mi Empresa C.A." style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                
+                <label for="empresaRif">RIF/Identificación:</label>
+                <input type="text" id="empresaRif" placeholder="Ej: J-12345678-9" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                
+                <label for="empresaTelefono">Teléfono:</label>
+                <input type="tel" id="empresaTelefono" placeholder="Ej: 0212-1234567" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                
+                <label for="empresaDireccion">Dirección:</label>
+                <textarea id="empresaDireccion" placeholder="Ej: Av. Principal, Edificio Central, Piso 5" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem; min-height: 80px; resize: vertical;"></textarea>
+                
+                <label for="empresaSector">Sector económico:</label>
+                <select id="empresaSector" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="">Selecciona un sector</option>
+                    <option value="Comercio">Comercio</option>
+                    <option value="Servicios">Servicios</option>
+                    <option value="Manufactura">Manufactura</option>
+                    <option value="Tecnología">Tecnología</option>
+                    <option value="Construcción">Construcción</option>
+                    <option value="Salud">Salud</option>
+                    <option value="Educación">Educación</option>
+                    <option value="Finanzas">Finanzas</option>
+                    <option value="Turismo">Turismo</option>
+                    <option value="Transporte">Transporte</option>
+                    <option value="Agricultura">Agricultura</option>
+                    <option value="General">General</option>
+                    <option value="Otro">Otro</option>
+                </select>
+                
+                <!-- Campo para logo de la empresa -->
+                <label for="empresaLogo">Logo de la empresa:</label>
+                <div style="margin-bottom: 1rem;">
+                    <input type="file" id="empresaLogo" accept="image/*" onchange="vistaPreviaLogo(this)" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:0.5rem;" />
+                    <div id="vistaPreviaLogoContainer" style="display: none; margin-top: 0.5rem;">
+                        <img id="vistaPreviaLogo" style="max-width: 150px; max-height: 100px; border: 1px solid #ddd; border-radius: 4px;" alt="Vista previa del logo">
+                        <button type="button" onclick="eliminarLogo()" style="margin-left: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.875rem;">Eliminar</button>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="agregarEmpresa()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">➕ Agregar Empresa</button>
+                    <button onclick="limpiarFormularioEmpresa()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🧹 Limpiar</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Listado de empresas -->
+        <section id="listadoEmpresas">
+            <h2>📋 Empresas Registradas
+                <button onclick="mostrarAyudaListadoEmpresas()" 
+                        style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+                        title="¿Cómo gestionar las empresas?">❓</button>
+            </h2>
+            <div id="contenedorEmpresas" style="margin-top: 1rem;">
+                <!-- Las empresas se cargarán dinámicamente aquí -->
+                <p style="text-align: center; color: var(--text-light);">Cargando empresas...</p>
+            </div>
+        </section>
+    </div>
+</div>
+
+<!-- ✅ NUEVA PESTAÑA: ASISTENTE FINANCIERO -->
+<div class="side-content" id="side-asistente-financiero">
+    <div class="sidebar-content">
+        <section id="configuracionAsistente">
+            <h2>⚙️ Configurar Asistente
+    <button onclick="mostrarAyudaAsistenteFinanciero()"
+        style="background:none; border:none; color:var(--primary); font-size:1rem; cursor:pointer; margin-left:0.5rem; padding:0.25rem; border-radius:50%; transition:background 0.2s;"
+        title="¿Cómo funciona el asistente financiero?">❓</button>
+    <!-- ✅ NUEVO: Botón de ejemplo (solo texto) -->
+<button onclick="mostrarEjemploAsistente()" 
+    style="background: var(--info); color: rgb(151, 145, 145); border: none; border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; margin-left: 0.5rem; transition: background 0.2s;"
+    title="Ver ejemplo de uso">
+    Ejemplo
+</button>
+</h2>
+
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">Define las reglas que el asistente usará para sugerir acciones automáticas.</p>
+
+            <!-- Formulario para configurar reglas del asistente -->
+            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+                <label for="reglaPalabraClave">Palabra clave:</label>
+                <input type="text" id="reglaPalabraClave" placeholder="Ej: servicios, comida, transporte" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;" />
+                <label for="reglaCategoria">Categoría objetivo:</label>
+                <select id="reglaCategoria" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="">Selecciona una categoría</option>
+                    <!-- Las opciones se cargarán dinámicamente -->
+                </select>
+                <label for="reglaAccion">Acción sugerida:</label>
+                <select id="reglaAccion" style="width:100%; padding:0.75rem; border:1px solid #ccc; border-radius:8px; font-size:1rem; margin-bottom:1rem;">
+                    <option value="sugerirAhorro">Sugerir plan de ahorro</option>
+                    <option value="alertarGasto">Alertar por gasto alto</option>
+                    <option value="recomendarCambio">Recomendar cambio de proveedor</option>
+                </select>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button onclick="agregarReglaAsistente()" style="flex:1; background:var(--primary); color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">➕ Agregar Regla</button>
+                    <button onclick="limpiarFormularioRegla()" style="flex:1; background:#6b7280; color:white; border:none; border-radius:8px; padding:0.75rem; font-size:1rem; cursor:pointer;">🧹 Limpiar</button>
+                </div>
+            </div>
+
+            <!-- ✅ BOTÓN PARA DESPLEGAR AJUSTES -->
+<div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--card-bg); border-radius: var(--radius); cursor: pointer;" onclick="toggleAjustesAsistente()">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <svg class="icon" viewBox="0 0 24 24" fill="#6B7280" style="width: 1rem; height: 1rem; transform: rotate(90deg); transition: transform 0.2s;">
+            <path d="M12 2L2 7l10 5 10-5V2z"/>
+        </svg>
+        <span style="font-weight: 500;">Ajustes</span>
+    </div>
+    <svg class="icon" id="flechaAjustes" viewBox="0 0 24 24" fill="#6B7280" style="width: 1rem; height: 1rem; transition: transform 0.2s;">
+        <path d="M16 12l-4 4-4-4H16z"/>
+    </svg>
+</div>
+
+<!-- ✅ SECCIÓN DE AJUSTES (oculta por defecto) -->
+<div id="seccionAjustes" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--card-bg); border-radius: var(--radius); border-left: 4px solid var(--primary); transition: all 0.2s ease;">
+    <h3 style="margin: 0 0 1rem 0; color: var(--text);">⚙️ Opciones de Categorías</h3>
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="mostrarTodasCategorias" onchange="actualizarSelectCategoriasAsistente()" style="transform: scale(1.2); accent-color: var(--info);">
+            <span>Mostrar todas las categorías del sistema</span>
+        </label>
+    </div>
+    <p style="color: var(--text-light); font-size: 0.875rem; margin: 0;">Si está activado, podrás usar cualquier categoría del sistema. Si está desactivado, solo verás las categorías específicas del asistente.</p>
+</div>
+
+            
+        </section>
+
+        <section id="sugerenciasAsistente">
+            <h2>📌 Sugerencias del Asistente</h2>
+            <div id="contenedorSugerencias" style="margin-top:1rem;">
+                <!-- Las sugerencias se cargarán dinámicamente aquí -->
+                <p style="text-align: center; color: var(--text-light);">No hay sugerencias disponibles en este momento.</p>
+            </div>
+        </section>
+
+        <section id="historialAsistente">
+            <h2>📋 Historial de Acciones</h2>
+            <div id="contenedorHistorial" style="margin-top:1rem;">
+                <!-- El historial de acciones se cargará dinámicamente aquí -->
+                <p style="text-align: center; color: var(--text-light);">No hay acciones registradas aún.</p>
+            </div>
+        </section> <!-- Cierre de la sección Asistente Financiero -->
+    </div>
+</div>
+
+  <script src="chart.umd.min.js?v=20251111"></script>
+  <script src="xlsx.full.min.js?v=20251111"></script>
+  <script src="equivalente-calculator.js"></script>
+  <script src="presupuesto-sugerido.js"></script>
+  <script src="app.js?v=20251111"></script>
+  
+  <!-- MODAL DE BLOQUEO (SIN CANCELAR) -->
+<div id="modalBloqueo" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1001; justify-content:center; align-items:center;">
   <div style="background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:2rem; width:90%; max-width:350px; text-align:center;">
-    <h2>🔒 Bloqueo de App</h2>
+    <img class="icon-png" src="recursos/icons/privacy.png" alt="Lock">
+    <h2 style="text-align: center;">Sistema de Gestión Financiera</h2>
     <p style="color:var(--text-light); margin-bottom:1.5rem;">Ingresa tu PIN de 4 dígitos para acceder.</p>
     <input type="password" id="pinInput" maxlength="4" minlength="4" placeholder="PIN de 4 dígitos" 
            style="width:100%; padding:1rem; font-size:1.5rem; text-align:center; margin-bottom:1.5rem; border:1px solid var(--text-light); border-radius:8px;"
            title="Escribe 'reset' si olvidaste tu PIN (solo para recuperación)">
     <button onclick="desbloquearApp()" style="width:100%; padding:1rem; font-size:1rem; background:#0b57d0; color:white; border:none; border-radius:8px;">Desbloquear</button>
-    <button onclick="cerrarModalBloqueo()" style="width:100%; padding:0.75rem; margin-top:1rem; background:var(--danger); color:white; border:none; border-radius:8px; font-size:0.9rem;">Cancelar</button>
+    <button onclick="mostrarAyudaPinOlvidado()" 
+            style="width:100%; padding:0.75rem; margin-top:1rem; background:transparent; color:var(--danger); border:1px solid var(--danger); border-radius:8px; font-size:0.9rem;">
+      ¿Olvidaste tu PIN?
+    </button>
     <p id="avisoPinOlvidado" style="font-size:0.75rem; color:var(--text-light); margin-top:1.5rem; font-style:italic; display:none;">
-      ⚠️ ¿Olvidaste tu PIN? Escribe <strong>"reset"</strong> para desactivar el bloqueo.
+      ⚠️ ¿No puedes acceder al sistema? Pulsa el botón <strong>"¿Olvidaste tu PIN?"</strong> y responde a las preguntas de seguridad.
     </p>
   </div>
+</div>
+
+  <!-- Toast -->
+  <div id="toast-container">
   </div>
+
+<div id="custom-confirm" class="custom-modal-overlay">
+  <div class="custom-modal-content">
+    <p id="confirm-message" style="font-weight: 500;"></p>
+    <div class="confirm-actions">
+      <button id="confirm-cancel" class="btn-cancelar">Cancelar</button>
+      <button id="confirm-ok" class="btn-aceptar">Aceptar</button>
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<!-- MODAL DE AYUDA (PRESUPUESTO)-->
+<div id="modalAyudaPresupuesto" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1002; justify-content:center; align-items:center;">
+  <div style="background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:2rem; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:relative;">
+    <button onclick="cerrarAyudaPresupuesto()" 
+            style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; color:var(--text-light); cursor:pointer; padding:0.5rem; border-radius:50%; transition:background 0.2s;"
+            title="Cerrar">✕</button>
+    
+    <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">🎯 ¿Cómo funciona la pestaña Presupuesto?</h2>
+    
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">📊 ¿Qué puedes hacer aquí?</h3>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li><strong>Definir meta mensual:</strong> Establece tu presupuesto objetivo para el mes</li>
+        <li><strong>Visualizar progreso:</strong> Ve qué porcentaje has gastado de tu meta</li>
+        <li><strong>Análisis detallado:</strong> Revisa gastos por categoría en los últimos 30 días</li>
+        <li><strong>Control total:</strong> Guarda, elimina o modifica tu meta cuando quieras</li>
+      </ul>
+    </div>
+    
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">💡 Consejos útiles</h3>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li>Define una meta realista basada en tus gastos históricos</li>
+        <li>Revisa frecuentemente el progreso para mantenerte en control</li>
+        <li>Usa las categorías para identificar áreas de mayor gasto</li>
+        <li>Ajusta tu meta mensualmente según tus necesidades</li>
+      </ul>
+    </div>
+    
+    <div style="background:var(--success-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--success); margin-top:1.5rem;">
+      <p style="margin:0; color:var(--success-text); font-size:0.875rem;">
+        <strong>🎉 Pro tip:</strong> Una buena meta de presupuesto es entre el 50-70% de tus ingresos mensuales, dejando espacio para imprevistos.
+      </p>
+    </div>
+    
+  </div>
+</div>
+
+<!-- MODAL DE AYUDA (INVERSIONES)-->
+<div id="modalAyudaInversiones" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1003; justify-content:center; align-items:center;">
+  <div style="background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:2rem; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:relative;">
+    <button onclick="cerrarAyudaInversiones()" 
+            style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; color:var(--text-light); cursor:pointer; padding:0.5rem; border-radius:50%; transition:background 0.2s;"
+            title="Cerrar">✕</button>
+    
+    <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📈 ¿Cómo funciona el Simulador de Inversiones?</h2>
+    
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">🎯 ¿Qué es esto?</h3>
+      <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">
+        <strong>¡Es un simulador educativo!</strong> No inviertes dinero real, solo simulas inversiones para aprender y experimentar con diferentes estrategias.
+      </p>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li><strong>Precios simulados:</strong> Los precios cambian automáticamente cada vez que actualizas</li>
+        <li><strong>Sin riesgo:</strong> Puedes experimentar con diferentes activos sin perder dinero</li>
+        <li><strong>Educativo:</strong> Perfecto para aprender conceptos de inversión</li>
+        <li><strong>Gráficos reales:</strong> Visualiza el rendimiento con gráficos profesionales</li>
+      </ul>
+    </div>
+    
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">📊 ¿Qué puedes hacer aquí?</h3>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li><strong>Agregar inversiones:</strong> Simula compra de acciones, cripto o fondos</li>
+        <li><strong>Seguimiento automático:</strong> Los precios se actualizan periódicamente</li>
+        <li><strong>Análisis visual:</strong> Ve gráficos de rendimiento y ganancias/pérdidas</li>
+        <li><strong>Portafolio simulado:</strong> Gestiona múltiples inversiones como en la vida real</li>
+      </ul>
+    </div>
+    
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">💡 Consejos para usar el simulador</h3>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li>Empieza con cantidades pequeñas para experimentar</li>
+        <li>Prueba diferentes tipos de activos (acciones, cripto, fondos)</li>
+        <li>Observa cómo cambian los precios y afecta tu portafolio</li>
+        <li>Usa fechas diferentes para simular inversiones a largo plazo</li>
+      </ul>
+    </div>
+    
+    <div style="background:var(--warning-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--warning); margin-top:1.5rem;">
+      <p style="margin:0; color:var(--warning-text); font-size:0.875rem;">
+        <strong>⚠️ Recordatorio:</strong> Esto es solo un simulador educativo. No refleja inversiones reales ni precios de mercado actuales. ¡Es perfecto para aprender sin riesgos!
+      </p>
+    </div>
+    
+  </div>
+</div>
+
+<!-- MODAL DE AYUDA (CALENDARIO)-->
+<div id="modalAyudaCalendario" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1004; justify-content:center; align-items:center;">
+  <div style="background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:2rem; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:relative;">
+    <button onclick="cerrarAyudaCalendario()" 
+            style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; color:var(--text-light); cursor:pointer; padding:0.5rem; border-radius:50%; transition:background 0.2s;"
+            title="Cerrar">✕</button>
+    <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📅 ¿Cómo funciona el Calendario Interactivo?</h2>
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">✨ ¿Qué ves aquí?</h3>
+      <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+        <li><strong>Calendario del mes actual:</strong> Solo muestras los días de este mes. Nada de días de otros meses.</li>
+        <li><strong>Puntos pulsantes:</strong> Los días con movimientos tienen un pequeño punto azul que parpadea.</li>
+        <li><strong>Hoy resaltado:</strong> El día actual tiene un punto más grande y un fondo sutil.</li>
+        <li><strong>Tarjetas detalladas:</strong> Haz clic en un día para ver sus movimientos como tarjetas horizontales.</li>
+        <li><strong>Paginación inteligente:</strong> Si hay más de 6 movimientos en un día, navega con ← →</li>
+      </ul>
+    </div>
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="color:var(--text); margin-bottom:0.75rem;">💡 Consejo</h3>
+      <p style="color:var(--text-light); line-height:1.6; margin:0;">
+        Usa este calendario para ver rápidamente en qué días tienes más actividad. ¡Ideal para planificar tus ingresos y gastos semanales!
+      </p>
+    </div>
+    <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+      <p style="margin:0; color:var(--info-text); font-size:0.875rem;">
+        <strong>✨ Diseño moderno:</strong> Este calendario fue creado con el estilo Windows 11: transparencias, blur y elegancia.
+      </p>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
