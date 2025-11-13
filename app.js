@@ -1,7 +1,7 @@
 // Variable global para la base de datos
 let db;
 const DB_NAME = 'sfpDB';
-const DB_VERSION = 19; // ✅ Versión actual de la base de datos
+const DB_VERSION = 24; // ✅ Versión actual de la base de datos
 
 // (variable global)
 let idRecordatorioEditando = null;
@@ -417,82 +417,133 @@ function openDB() {
 // Funciones genéricas para interactuar con la DB con manejo de errores mejorado
 async function addEntry(storeName, entry) {
     try {
-        // Verificar si el object store existe antes de intentar usarlo
+        console.log(`[DEBUG] addEntry llamado para store: ${storeName}.`);
         if (!db.objectStoreNames.contains(storeName)) {
-            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            console.warn(`[DEBUG] Object store '${storeName}' no existe. Intentando crearlo...`);
             await crearObjectStoreSiNoExiste(storeName);
+            console.log(`[DEBUG] Object store '${storeName}' debería existir ahora.`);
         }
-
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
+        console.log(`[DEBUG] Transacción creada para add en '${storeName}'.`);
         return new Promise((resolve, reject) => {
             const request = store.add(entry);
             request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject(event.target.error);
+            request.onerror = (event) => {
+                console.error(`[DEBUG] Error en add para '${storeName}':`, event.target.error);
+                reject(event.target.error);
+            };
         });
     } catch (error) {
-        console.error(`Error en addEntry para ${storeName}:`, error);
+        console.error(`[DEBUG] Error general en addEntry para ${storeName}:`, error);
         throw error;
     }
 }
 
 async function getAllEntries(storeName) {
     try {
+        console.log(`[DEBUG] getAllEntries llamado para store: ${storeName}. DB Version: ${db.version}, Stores:`, Array.from(db.objectStoreNames));
         // Verificar si el object store existe antes de intentar usarlo
         if (!db.objectStoreNames.contains(storeName)) {
-            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
-            await crearObjectStoreSiNoExiste(storeName);
+            console.warn(`[DEBUG] Object store '${storeName}' no existe en la DB actual (v${db.version}). Intentando crearlo...`);
+            await crearObjectStoreSiNoExiste(storeName); // Esperar a que se cree
+            console.log(`[DEBUG] Object store '${storeName}' debería existir ahora.`);
+            // Importante: Después de crear el store, la transacción de getAll debe usar la nueva instancia de db
+            // que ya contiene el store recién creado.
+        } else {
+             console.log(`[DEBUG] Object store '${storeName}' ya existía.`);
         }
 
+        // Ahora, db debería contener el store, así que creamos la transacción
         const transaction = db.transaction([storeName], 'readonly');
         const store = transaction.objectStore(storeName);
+        console.log(`[DEBUG] Transacción creada para getAll en '${storeName}'.`);
         return new Promise((resolve, reject) => {
             const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject(event.target.error);
+            request.onsuccess = () => {
+                console.log(`[DEBUG] getAll completado exitosamente para '${storeName}'. Cantidad de entradas: ${request.result.length}`);
+                resolve(request.result);
+            };
+            request.onerror = (event) => {
+                console.error(`[DEBUG] Error en getAll para '${storeName}':`, event.target.error);
+                reject(event.target.error);
+            };
         });
     } catch (error) {
-        console.error(`Error en getAllEntries para ${storeName}:`, error);
-        throw error;
+        console.error(`[DEBUG] Error general en getAllEntries para ${storeName}:`, error);
+        throw error; // Re-lanzar el error para que la función que llamó a getAllEntries lo maneje
     }
 }
 
 // Función auxiliar para crear object stores dinámicamente si no existen
+// Asegura que la variable global 'db' se actualice tras la creación
 async function crearObjectStoreSiNoExiste(storeName) {
-    return new Promise((resolve, reject) => {
-        // Necesitamos cerrar la conexión actual y reabrirla con una nueva versión
+    console.log(`[DEBUG] Iniciando creación de object store '${storeName}' si no existe.`);
+    // Cerramos la conexión actual
+    if (db && db.readyState !== 'closed' && db.readyState !== 'closing') {
         db.close();
+    }
 
-        const nuevaVersion = DB_VERSION + 1; // Incrementar versión para permitir cambios de esquema
+    const nuevaVersion = (db ? db.version : 1) + 1; // Usamos la versión actual de la base de datos abierta como base
+    console.log(`[DEBUG] Reabriendo DB con nueva versión: ${nuevaVersion}`);
+
+    return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, nuevaVersion);
 
         request.onupgradeneeded = (event) => {
             const dbUpgrade = event.target.result;
+            console.log(`[DEBUG] onupgradeneeded ejecutado para versión ${nuevaVersion}. Stores actuales:`, Array.from(dbUpgrade.objectStoreNames));
 
-            // Crear el object store que falta
+            // Crear el object store que falta solo si no existe
             if (!dbUpgrade.objectStoreNames.contains(storeName)) {
-                if (storeName === STORES.INVERSIONES) {
-                    dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
-                } else {
-                    // Para otros stores, usar configuración por defecto
-                    dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+                let newStore;
+                // Configuración específica por store si es necesario
+                switch (storeName) {
+                    case STORES.INVERSIONES:
+                    case STORES.MOVIMIENTOS:
+                    case STORES.CATEGORIAS:
+                    case STORES.BANCOS:
+                    case STORES.REGLAS:
+                    case STORES.SALDO_INICIAL:
+                    case STORES.EMPRESAS:
+                    case STORES.PROVEEDORES: // Añadido
+                    case STORES.INVENTARIO:  // Añadido
+                    case STORES.NOTAS:
+                    case STORES.ASISTENTE:
+                    case STORES.CATEGORIAS_ASISTENTE:
+                        newStore = dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+                        // Si movimientos ya existía, creamos su índice aquí también si es necesario y no existe
+                        if (storeName === STORES.MOVIMIENTOS) {
+                             // Verificar si el índice ya existe antes de crearlo
+                             if (!newStore.indexNames.contains('empresaIndex')) {
+                                 newStore.createIndex('empresaIndex', 'empresaId', { unique: false });
+                             }
+                        }
+                        break;
+                    default:
+                        // Para otros stores, usar configuración por defecto
+                        newStore = dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
                 }
-                console.log(`Object store '${storeName}' creado exitosamente`);
+                console.log(`[DEBUG] Object store '${storeName}' creado exitosamente en onupgradeneeded.`);
+            } else {
+                 console.log(`[DEBUG] Object store '${storeName}' ya existía en onupgradeneeded.`);
             }
         };
 
         request.onsuccess = (event) => {
+            // Actualizar la variable global 'db' con la nueva instancia
             db = event.target.result;
-            console.log(`Base de datos actualizada a versión ${nuevaVersion}`);
+            console.log(`[DEBUG] Base de datos actualizada a versión ${nuevaVersion} y variable 'db' global actualizada.`);
             resolve();
         };
 
         request.onerror = (event) => {
-            console.error('Error al actualizar la base de datos:', event.target.error);
+            console.error('[DEBUG] Error al actualizar la base de datos en crearObjectStoreSiNoExiste:', event.target.error);
             reject(event.target.error);
         };
     });
 }
+
 
 // ✅ Función para obtener un solo registro por ID
 function getEntry(storeName, id) {
@@ -532,42 +583,50 @@ function deleteEntry(storeName, id) {
 
 async function updateEntry(storeName, entry) {
     try {
-        // Verificar si el object store existe antes de intentar usarlo
+        console.log(`[DEBUG] updateEntry llamado para store: ${storeName}.`);
         if (!db.objectStoreNames.contains(storeName)) {
-            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            console.warn(`[DEBUG] Object store '${storeName}' no existe. Intentando crearlo...`);
             await crearObjectStoreSiNoExiste(storeName);
+            console.log(`[DEBUG] Object store '${storeName}' debería existir ahora.`);
         }
-
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
+        console.log(`[DEBUG] Transacción creada para update en '${storeName}'.`);
         return new Promise((resolve, reject) => {
-            const request = store.put(entry);
+            const request = store.put(entry); // put actualiza si tiene keyPath, inserta si no
             request.onsuccess = () => resolve(request.result);
-            request.onerror = (event) => reject(event.target.error);
+            request.onerror = (event) => {
+                console.error(`[DEBUG] Error en update para '${storeName}':`, event.target.error);
+                reject(event.target.error);
+            };
         });
     } catch (error) {
-        console.error(`Error en updateEntry para ${storeName}:`, error);
+        console.error(`[DEBUG] Error general en updateEntry para ${storeName}:`, error);
         throw error;
     }
 }
 
 async function deleteEntry(storeName, key) {
     try {
-        // Verificar si el object store existe antes de intentar usarlo
+        console.log(`[DEBUG] deleteEntry llamado para store: ${storeName}, key: ${key}.`);
         if (!db.objectStoreNames.contains(storeName)) {
-            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            console.warn(`[DEBUG] Object store '${storeName}' no existe. Intentando crearlo...`);
             await crearObjectStoreSiNoExiste(storeName);
+            console.log(`[DEBUG] Object store '${storeName}' debería existir ahora.`);
         }
-
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
+        console.log(`[DEBUG] Transacción creada para delete en '${storeName}'.`);
         return new Promise((resolve, reject) => {
             const request = store.delete(key);
-            request.onsuccess = () => resolve(true);
-            request.onerror = (event) => reject(event.target.error);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => {
+                console.error(`[DEBUG] Error en delete para '${storeName}':`, event.target.error);
+                reject(event.target.error);
+            };
         });
     } catch (error) {
-        console.error(`Error en deleteEntry para ${storeName}:`, error);
+        console.error(`[DEBUG] Error general en deleteEntry para ${storeName}:`, error);
         throw error;
     }
 }
