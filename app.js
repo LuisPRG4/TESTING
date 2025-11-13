@@ -1,17 +1,133 @@
 // Variable global para la base de datos
 let db;
 const DB_NAME = 'sfpDB';
-const DB_VERSION = 1;
+const DB_VERSION = 19; // ✅ Versión actual de la base de datos
+
+// (variable global)
+let idRecordatorioEditando = null;
+let sonidoPersonalizado = null; // almacenamos temporalmente el audio subido
+let ultimoGuardado = null; // variables globales para control
+
+// SONIDO DE LOS RECORDATORIOS
+document.getElementById('uploadSonido').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    const base64 = ev.target.result;
+    localStorage.setItem('sonidoPersonalizado', base64);
+    mostrarToast('🎵 Sonido personalizado guardado', 'success');
+    sonidoPersonalizado = base64;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('selectSonido').addEventListener('change', (e) => {
+  localStorage.setItem('sonidoSeleccionado', e.target.value);
+});
+
+document.getElementById('btnProbarSonido').addEventListener('click', () => {
+  reproducirSonidoAviso();
+});
 
 // Nombres de los almacenes de objetos
 const STORES = {
-
     MOVIMIENTOS: 'movimientos',
     CATEGORIAS: 'categorias',
     BANCOS: 'bancos',
     REGLAS: 'reglas',
-    SALDO_INICIAL: 'saldo_inicial'
+    SALDO_INICIAL: 'saldo_inicial',
+    INVERSIONES: 'inversiones',
+    // NUEVO: Almacenamiento para Notas
+    NOTAS: 'notas',
+    PROVEEDORES: 'proveedores',
+    INVENTARIO: 'inventario',
+    ASISTENTE: 'asistente',
+    CATEGORIAS_ASISTENTE: 'categorias_asistente',
+    // NUEVO: Almacenamiento para Empresas (Sistema Multi-Empresa)
+    EMPRESAS: 'empresas'
 };
+
+// ======================================================================================
+// FUNCIONES MODERNAS PARA ALERTAS Y CONFIRMACIONES (Reemplazo de alert() y confirm())
+// ======================================================================================
+
+/**
+ * Función para mostrar notificaciones estilo "Toast" (reemplazo de alert).
+ * @param {string} mensaje - El texto del mensaje.
+ * @param {string} [tipo='info'] - El tipo de mensaje: 'success', 'danger', o 'info'.
+ */
+function mostrarToast(mensaje, tipo = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return; 
+
+    const toast = document.createElement('div');
+    toast.className = `custom-toast ${tipo}`;
+    toast.textContent = mensaje;
+    
+    container.appendChild(toast);
+    
+    // Forzar reflow para que la transición de entrada funcione
+    void toast.offsetWidth; 
+    toast.classList.add('show');
+
+    // Desaparecer después de 3 segundos
+    setTimeout(() => {
+        toast.classList.remove('show');
+        // Eliminar el toast del DOM después de que la transición haya terminado
+        toast.addEventListener('transitionend', () => {
+            toast.remove();
+        }, { once: true });
+    }, 3000);
+}
+
+/**
+ * Función para mostrar un modal de confirmación personalizado (reemplazo de confirm).
+ * @param {string} mensaje - El texto de la pregunta de confirmación.
+ * @returns {Promise<boolean>} - Resuelve a true si se presiona Aceptar, false si se presiona Cancelar.
+ */
+function mostrarConfirmacion(mensaje) {
+    const overlay = document.getElementById('custom-confirm');
+    const messageEl = document.getElementById('confirm-message');
+    const okBtn = document.getElementById('confirm-ok');
+    const cancelBtn = document.getElementById('confirm-cancel');
+
+    // Fallback al nativo si la estructura HTML no existe
+    if (!overlay || !messageEl || !okBtn || !cancelBtn) {
+        return Promise.resolve(window.confirm(mensaje));
+    }
+
+    messageEl.textContent = mensaje;
+    overlay.classList.add('show');
+
+    return new Promise((resolve) => {
+        const handleResult = (result) => {
+            // Limpiar listeners y ocultar
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            overlay.classList.remove('show');
+            // Resolver la promesa
+            resolve(result);
+        };
+
+        const onOk = () => handleResult(true);
+        const onCancel = () => handleResult(false);
+
+        // Añadir listeners
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+
+        // Permitir cerrar con ESC
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                handleResult(false);
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    });
+}
 
 // ✅ FUNCIONES PARA FORMATO VENEZOLANO (punto mil, coma decimal)
 function formatNumberVE(num) {
@@ -68,9 +184,9 @@ function copiarFormateado() {
     const texto = document.getElementById('numeroFormateado').textContent;
     if (texto === 'Formato inválido' || texto === '0,00') return;
     navigator.clipboard.writeText(texto).then(() => {
-        alert('✅ Copiado al portapapeles: ' + texto);
+        mostrarToast('✅ Copiado al portapapeles: ' + texto, 'success');
     }).catch(() => {
-        alert('❌ No se pudo copiar. Usa Ctrl+C.');
+        mostrarToast('❌ No se pudo copiar. Usa Ctrl+C.', 'danger');
     });
 }
 function usarEnCantidad() {
@@ -79,7 +195,7 @@ function usarEnCantidad() {
     // Convertir de "1.111.783,99" a "1111783.99" para que parseNumberVE lo entienda
     const limpio = formateado.replace(/\./g, '').replace(',', '.');
     document.getElementById('cantidad').value = limpio;
-    alert('✅ Valor aplicado al campo "Cantidad".');
+    mostrarToast('✅ Valor aplicado al campo "Cantidad".', 'success');
     mostrarSideTab('movimientos');
     document.getElementById('cantidad').focus();
 }
@@ -89,7 +205,7 @@ function usarEnSaldoInicial() {
     // Convertir de "1.111.783,99" a "1111783.99" para que parseNumberVE lo entienda
     const limpio = formateado.replace(/\./g, '').replace(',', '.');
     document.getElementById('saldoInicial').value = limpio;
-    alert('✅ Valor aplicado al campo "Saldo Inicial".');
+    mostrarToast('✅ Valor aplicado al campo "Saldo Inicial".', 'success');
     mostrarSideTab('movimientos');
     document.getElementById('saldoInicial').focus();
 }
@@ -101,17 +217,117 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// ✅ FUNCIONES PARA LA HERRAMIENTA DE FORMATO DE NÚMEROS
+
+// ✅ Función para mostrar números según el modo de entrada configurado
+function displayNumber(num, textoOriginal = null) {
+    const modo = localStorage.getItem('numeroModo') || 'automatico';
+    
+    if (modo === 'literal') {
+        // En modo literal, mostrar el texto original si existe
+        if (textoOriginal) {
+            return textoOriginal;
+        }
+        // Si no hay texto original, mostrar el número como string
+        return num.toString();
+    } else {
+        // En modo automático, usar el formato venezolano estándar
+        return formatNumberVE(num);
+    }
+}
+
 function parseNumberVE(str) {
     if (!str || typeof str !== 'string') return 0;
-    // Eliminar puntos (separadores de miles) y reemplazar coma por punto
-    const cleaned = str.replace(/\./g, '').replace(',', '.');
+
+    const modo = localStorage.getItem('numeroModo') || 'automatico';
+
+    if (modo === 'literal') {
+        let cleaned = str.trim().replace(/ /g, '');
+        
+        const regex = /^-?\d+(?:[.,]\d+)?$/;
+        if (!regex.test(cleaned)) return 0;
+
+        if (cleaned.includes('.')) {
+            return parseFloat(cleaned);
+        }
+
+        if (cleaned.includes(',')) {
+            cleaned = cleaned.replace(',', '.');
+            return parseFloat(cleaned);
+        }
+
+        return parseFloat(cleaned);
+    }
+
+    let cleaned = str.replace(/\./g, '').replace(',', '.');
     const num = parseFloat(cleaned);
     return isNaN(num) ? 0 : num;
 }
 
+//Versión del sistema:
+const APP_VERSION = '1.1.2';
+
+// ✅ Función global para limpiar todos los almacenes antes de importar un backup
+async function clearAllStores() {
+    if (!db) {
+        await openDB();
+    }
+
+    const storeNames = [...Object.values(STORES)];
+
+    if (typeof STORES_RECORDATORIOS !== 'undefined' && STORES_RECORDATORIOS?.RECORDATORIOS) {
+        storeNames.push(STORES_RECORDATORIOS.RECORDATORIOS);
+    }
+
+    for (const storeName of storeNames) {
+        if (db.objectStoreNames.contains(storeName)) {
+            const transaction = db.transaction([storeName], 'readwrite');
+            const store = transaction.objectStore(storeName);
+            store.clear();
+        }
+    }
+
+    console.log("✅ Todos los almacenes han sido limpiados correctamente.");
+}
+
+
+// ✅ Función para crear datos de backup (necesaria para el almacén)
+async function crearBackupData() {
+    try {
+        const backupData = {
+            version: APP_VERSION,
+            fechaCreacion: new Date().toISOString(),
+            datos: {
+                movimientos: await getAllEntries(STORES.MOVIMIENTOS),
+                categorias: await getAllEntries(STORES.CATEGORIAS),
+                bancos: await getAllEntries(STORES.BANCOS),
+                reglas: await getAllEntries(STORES.REGLAS),
+                saldoInicial: await getAllEntries(STORES.SALDO_INICIAL),
+                inversiones: await getAllEntries(STORES.INVERSIONES),
+                configuracion: {
+                    tasaCambio: localStorage.getItem('tasaCambio'),
+                    numeroModo: localStorage.getItem('numeroModo'),
+                    bloqueoActivo: localStorage.getItem('bloqueoActivo'),
+                    tema: localStorage.getItem('agendaTema'),
+                    presupuestoMeta: localStorage.getItem('presupuestoMeta'),
+                    presupuestoGastado: localStorage.getItem('presupuestoGastado'),
+                    sonidosActivados: localStorage.getItem('sonidosActivados'),
+                    umbralAlerta: localStorage.getItem('umbralAlerta')
+                }
+            }
+        };
+
+        return backupData;
+    } catch (error) {
+        console.error('Error creando datos de backup:', error);
+        throw error;
+    }
+}
+
 // Configuración de paginación
-const MOVIMIENTOS_POR_PAGINA = 10;
+const MOVIMIENTOS_POR_PAGINA = 10;          // para la lista general
 let paginaActual = 1;
+
 
 // ✅ Variable global para guardar el ID del movimiento que se está editando
 let idMovimientoEditando = null; 
@@ -157,6 +373,32 @@ function openDB() {
             if (!db.objectStoreNames.contains(STORES.SALDO_INICIAL)) {
                 db.createObjectStore(STORES.SALDO_INICIAL, { keyPath: 'id' });
             }
+
+            // Pestaña Inversiones
+            if (!db.objectStoreNames.contains(STORES.INVERSIONES)) {
+                db.createObjectStore(STORES.INVERSIONES, { keyPath: 'id', autoIncrement: true });
+            }
+
+            // Almacén Recordatorios
+            if (!db.objectStoreNames.contains('recordatorios')) {
+                const recStore = db.createObjectStore('recordatorios', { keyPath: 'id', autoIncrement: true });
+            recStore.createIndex('fechaIndex', 'fechaLimite', { unique: false });
+            }
+
+            // ✅ NUEVO: Almacén para Empresas (Sistema Multi-Empresa)
+            if (!db.objectStoreNames.contains(STORES.EMPRESAS)) {
+                const empresasStore = db.createObjectStore(STORES.EMPRESAS, { keyPath: 'id', autoIncrement: true });
+                empresasStore.createIndex('nombreIndex', 'nombre', { unique: false });
+                empresasStore.createIndex('rifIndex', 'rif', { unique: true });
+            }
+
+            // ✅ MODIFICACIÓN: Agregar campo empresaId a movimientos si no existe
+            if (db.objectStoreNames.contains(STORES.MOVIMIENTOS)) {
+                const movimientosStore = event.target.transaction.objectStore(STORES.MOVIMIENTOS);
+                if (!movimientosStore.indexNames.contains('empresaIndex')) {
+                    movimientosStore.createIndex('empresaIndex', 'empresaId', { unique: false });
+                }
+            }
         };
 
         request.onsuccess = (event) => {
@@ -172,24 +414,83 @@ function openDB() {
     });
 }
 
-// Funciones genéricas para interactuar con la DB
+// Funciones genéricas para interactuar con la DB con manejo de errores mejorado
 async function addEntry(storeName, entry) {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    return new Promise((resolve, reject) => {
-        const request = store.add(entry);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = (event) => reject(event.target.error);
-    });
+    try {
+        // Verificar si el object store existe antes de intentar usarlo
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            await crearObjectStoreSiNoExiste(storeName);
+        }
+
+        const transaction = db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        return new Promise((resolve, reject) => {
+            const request = store.add(entry);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    } catch (error) {
+        console.error(`Error en addEntry para ${storeName}:`, error);
+        throw error;
+    }
 }
 
 async function getAllEntries(storeName) {
-    const transaction = db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
+    try {
+        // Verificar si el object store existe antes de intentar usarlo
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            await crearObjectStoreSiNoExiste(storeName);
+        }
+
+        const transaction = db.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        return new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    } catch (error) {
+        console.error(`Error en getAllEntries para ${storeName}:`, error);
+        throw error;
+    }
+}
+
+// Función auxiliar para crear object stores dinámicamente si no existen
+async function crearObjectStoreSiNoExiste(storeName) {
     return new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = (event) => reject(event.target.error);
+        // Necesitamos cerrar la conexión actual y reabrirla con una nueva versión
+        db.close();
+
+        const nuevaVersion = DB_VERSION + 1; // Incrementar versión para permitir cambios de esquema
+        const request = indexedDB.open(DB_NAME, nuevaVersion);
+
+        request.onupgradeneeded = (event) => {
+            const dbUpgrade = event.target.result;
+
+            // Crear el object store que falta
+            if (!dbUpgrade.objectStoreNames.contains(storeName)) {
+                if (storeName === STORES.INVERSIONES) {
+                    dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+                } else {
+                    // Para otros stores, usar configuración por defecto
+                    dbUpgrade.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
+                }
+                console.log(`Object store '${storeName}' creado exitosamente`);
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            console.log(`Base de datos actualizada a versión ${nuevaVersion}`);
+            resolve();
+        };
+
+        request.onerror = (event) => {
+            console.error('Error al actualizar la base de datos:', event.target.error);
+            reject(event.target.error);
+        };
     });
 }
 
@@ -230,55 +531,90 @@ function deleteEntry(storeName, id) {
 }
 
 async function updateEntry(storeName, entry) {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    return new Promise((resolve, reject) => {
-        const request = store.put(entry);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = (event) => reject(event.target.error);
-    });
+    try {
+        // Verificar si el object store existe antes de intentar usarlo
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            await crearObjectStoreSiNoExiste(storeName);
+        }
+
+        const transaction = db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        return new Promise((resolve, reject) => {
+            const request = store.put(entry);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    } catch (error) {
+        console.error(`Error en updateEntry para ${storeName}:`, error);
+        throw error;
+    }
 }
 
 async function deleteEntry(storeName, key) {
-    const transaction = db.transaction([storeName], 'readwrite');
-    const store = transaction.objectStore(storeName);
-    return new Promise((resolve, reject) => {
-        const request = store.delete(key);
-        request.onsuccess = () => resolve(true);
-        request.onerror = (event) => reject(event.target.error);
-    });
+    try {
+        // Verificar si el object store existe antes de intentar usarlo
+        if (!db.objectStoreNames.contains(storeName)) {
+            console.warn(`Object store '${storeName}' no existe. Creándolo...`);
+            await crearObjectStoreSiNoExiste(storeName);
+        }
+
+        const transaction = db.transaction([storeName], 'readwrite');
+        const store = transaction.objectStore(storeName);
+        return new Promise((resolve, reject) => {
+            const request = store.delete(key);
+            request.onsuccess = () => resolve(true);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    } catch (error) {
+        console.error(`Error en deleteEntry para ${storeName}:`, error);
+        throw error;
+    }
 }
 
 // ✅ Función para cargar un movimiento en el formulario para editar
 async function cargarMovimientoParaEditar(id) {
-    if (confirm("¿Deseas editar este movimiento?")) {
+    if (await mostrarConfirmacion("¿Deseas editar este movimiento?")) {
         try {
-            // Asegurarse de que estamos en la pestaña correcta
+            // ✅ MEJORA: Limpiar formulario antes de cargar
+            limpiarForm();
+            
             mostrarSideTab('movimientos');
 
             const movimiento = await getEntry(STORES.MOVIMIENTOS, id);
             if (movimiento) {
-                document.getElementById('concepto').value = movimiento.concepto;
-                document.getElementById('cantidad').value = movimiento.cantidad;
-                document.getElementById('tipo').value = movimiento.tipo;
-                document.getElementById('categoria').value = movimiento.categoria;
-                document.getElementById('fechaMov').value = new Date(movimiento.fecha).toISOString().split('T')[0];
-                document.getElementById('banco').value = movimiento.banco;
+                // ✅ MEJORA: Cargar datos con validación
+                document.getElementById('concepto').value = movimiento.concepto || '';
+                document.getElementById('cantidad').value = movimiento.textoOriginal || movimiento.cantidad.toString();
+                document.getElementById('tipo').value = movimiento.tipo || 'ingreso';
+                document.getElementById('categoria').value = movimiento.categoria || '';
+                
+                // ✅ MEJORA: Formatear fecha correctamente
+                const fecha = new Date(movimiento.fecha);
+                const fechaFormateada = fecha.toISOString().split('T')[0];
+                document.getElementById('fechaMov').value = fechaFormateada;
+                
+                document.getElementById('banco').value = movimiento.banco || '';
 
+                // ✅ MEJORA: Mostrar botones de edición
                 document.getElementById('btnAgregar').style.display = 'none';
                 document.getElementById('btnActualizar').style.display = 'block';
                 document.getElementById('btnCancelarEdicion').style.display = 'block';
                 
                 idMovimientoEditando = id;
 
-                // ✅ Buscar la sección del formulario dentro del contenedor de la pestaña
+                // ✅ MEJORA: Hacer scroll suave al formulario
                 const formSection = document.querySelector('#side-movimientos section:first-of-type');
                 if (formSection) {
                     formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
+                
+                // ✅ MEJORA: Mostrar notificación
+                mostrarToast(`✏️ Editando: ${movimiento.concepto}`, 'info');
             }
         } catch (error) {
             console.error("Error al cargar movimiento para editar:", error);
+            mostrarToast("❌ Error al cargar el movimiento para editar", 'danger');
         }
     }
 }
@@ -286,7 +622,7 @@ async function cargarMovimientoParaEditar(id) {
 // ✅ Función para actualizar el movimiento en la base de datos
 async function actualizarMovimiento() {
     if (!idMovimientoEditando) {
-        alert("No hay un movimiento seleccionado para editar.");
+        mostrarToast("No hay un movimiento seleccionado para editar.", 'danger');
         return;
     }
 
@@ -296,39 +632,52 @@ async function actualizarMovimiento() {
     const categoria = document.getElementById('categoria').value;
     const fecha = new Date(document.getElementById('fechaMov').value + 'T12:00:00');
     const banco = document.getElementById('banco').value;
+    const empresaId = document.getElementById('empresaMovimiento').value;
 
     // ✅ AÑADE ESTA VALIDACIÓN JUSTO ABAJO
     if (isNaN(cantidad) || cantidad <= 0) {
-    alert('Ingresa una cantidad válida mayor a 0.');
+        mostrarToast('Ingresa una cantidad válida mayor a 0.', 'danger');
     return;
     }
 
-    const movimientoActualizado = {
-    id: idMovimientoEditando,
-    concepto: concepto,
-    cantidad: cantidad,
-    tipo: tipo,
-    categoria: categoria,
-    fecha: fecha.toISOString(),
-    banco: banco,
-    // ✅ Recalcular comisión si es gasto, o poner 0 si no lo es
-    comision: tipo === 'gasto' ? (cantidad * 0.003) : 0
-};
+        // ✅ OBTENER EL TEXTO ORIGINAL EN MODO LITERAL
+        const modo = localStorage.getItem('numeroModo') || 'automatico';
+        let textoOriginal = null;
+        
+        if (modo === 'literal') {
+          textoOriginal = document.getElementById('cantidad').value;
+        }
+    
+        const movimientoActualizado = {
+        id: idMovimientoEditando,
+        concepto: concepto,
+        cantidad: cantidad,
+        tipo: tipo,
+        categoria: categoria,
+        fecha: fecha.toISOString(),
+        banco: banco,
+        // ✅ NUEVO: Asociar a empresa si se seleccionó
+        empresaId: empresaId ? parseInt(empresaId) : null,
+        // ✅ NUEVO: Guardar texto original para modo literal
+        textoOriginal: textoOriginal,
+        // ✅ Recalcular comisión si es gasto, o poner 0 si no lo es
+        comision: tipo === 'gasto' ? (cantidad * 0.003) : 0
+    };
 
     try {
         await updateEntry(STORES.MOVIMIENTOS, movimientoActualizado);
         await renderizar();
         limpiarForm();
-        alert("Movimiento actualizado con éxito.");
+        mostrarToast("Movimiento actualizado con éxito.", 'success');
     } catch (error) {
         console.error("Error al actualizar movimiento:", error);
-        alert("Error al actualizar el movimiento. Intenta de nuevo.");
+        mostrarToast("Error al actualizar el movimiento. Intenta de nuevo.", 'danger');
     }
 }
 
 // ✅ Función para cancelar la edición con confirmación
-function cancelarEdicion() {
-    if (confirm("¿Estás seguro de que quieres cancelar la edición? Los cambios no se guardarán.")) {
+async function cancelarEdicion() {
+    if (await mostrarConfirmacion("¿Estás seguro de que quieres cancelar la edición? Los cambios no se guardarán.")) {
         limpiarForm();
         idMovimientoEditando = null;
     }
@@ -336,15 +685,15 @@ function cancelarEdicion() {
 
 // ✅ Función para eliminar un movimiento con confirmación
 async function eliminarMovimiento(id) {
-    if (confirm("¿Estás seguro de que quieres eliminar este movimiento?")) {
+    if (await mostrarConfirmacion("¿Estás seguro de que quieres eliminar este movimiento?")) {
         try {
             await deleteEntry(STORES.MOVIMIENTOS, id);
             await renderizar();
             await actualizarSaldo();
-            alert("Movimiento eliminado con éxito.");
+            mostrarToast("Movimiento eliminado con éxito.", 'success');
         } catch (error) {
             console.error("Error al eliminar el movimiento:", error);
-            alert("Error al eliminar el movimiento. Intenta de nuevo.");
+            mostrarToast("Error al eliminar el movimiento. Intenta de nuevo.", 'danger');
         }
     }
 }
@@ -364,11 +713,12 @@ async function agregarMovimiento() {
   const tipo = document.getElementById('tipo').value; // puede ser 'ingreso', 'gasto', 'saldo_inicial'
   const categoria = document.getElementById('categoria').value;
   const banco = document.getElementById('banco').value;
+  const empresaId = document.getElementById('empresaMovimiento').value;
   const fechaInput = document.getElementById('fechaMov').value;
 
   // Validación básica
   if (!concepto || !banco || !fechaInput) {
-    alert('Por favor, completa el concepto, el banco y la fecha.');
+    mostrarToast('Por favor, completa el concepto, el banco y la fecha.', 'danger');
     return;
   }
 
@@ -376,32 +726,48 @@ async function agregarMovimiento() {
  if (tipo === 'saldo_inicial') {
     const saldoInicial = parseNumberVE(document.getElementById('saldoInicial').value); // ✅ CAMBIO CLAVE
     if (isNaN(saldoInicial) || saldoInicial <= 0) {
-        alert('Ingresa un saldo inicial válido mayor a 0.');
+        mostrarToast('Ingresa un saldo inicial válido mayor a 0.', 'danger');
         return;
     }
     monto = saldoInicial;
  } else {
     const cantidad = parseNumberVE(document.getElementById('cantidad').value);
     if (isNaN(cantidad) || cantidad <= 0) {
-        alert('Ingresa una cantidad válida mayor a 0.');
+        mostrarToast('Ingresa una cantidad válida mayor a 0.', 'danger');
         return;
     }
     monto = cantidad;
  }
 
-  // Crear movimiento
-  const movimiento = {
-    concepto: tipo === 'saldo_inicial'
-      ? `${concepto} (Saldo inicial: ${banco})`
-      : concepto,
-    cantidad: monto,
-    tipo: tipo === 'saldo_inicial' ? 'ingreso' : tipo,
-    categoria: categoria || 'Sin categoría',
-    fecha: new Date(fechaInput + 'T12:00:00').toISOString(),
-    banco: banco,
-    // ✅ NUEVO: Calcular y guardar la comisión solo una vez
-    comision: tipo === 'gasto' ? (monto * 0.003) : 0
- };
+    // ✅ OBTENER EL TEXTO ORIGINAL EN MODO LITERAL
+    const modo = localStorage.getItem('numeroModo') || 'automatico';
+    let textoOriginal = null;
+    
+    if (modo === 'literal') {
+      if (tipo === 'saldo_inicial') {
+        textoOriginal = document.getElementById('saldoInicial').value;
+      } else {
+        textoOriginal = document.getElementById('cantidad').value;
+      }
+    }
+  
+    // Crear movimiento
+    const movimiento = {
+      concepto: tipo === 'saldo_inicial'
+        ? `${concepto} (Saldo inicial: ${banco})`
+        : concepto,
+      cantidad: monto,
+      tipo: tipo === 'saldo_inicial' ? 'ingreso' : tipo,
+      categoria: categoria || 'Sin categoría',
+      fecha: new Date(fechaInput + 'T12:00:00').toISOString(),
+      banco: banco,
+      // ✅ NUEVO: Asociar a empresa si se seleccionó
+      empresaId: empresaId ? parseInt(empresaId) : null,
+      // ✅ NUEVO: Guardar texto original para modo literal
+      textoOriginal: textoOriginal,
+      // ✅ NUEVO: Calcular y guardar la comisión solo una vez
+      comision: tipo === 'gasto' ? (monto * 0.003) : 0
+   };
 
      // ✅ CAPTURAR RECIBO (si se subió)
     const fileInput = document.getElementById('recibo');
@@ -423,17 +789,17 @@ async function agregarMovimiento() {
                         renderizar();
                         actualizarSaldo();
                         limpiarForm();
-                        alert("✅ Movimiento agregado con éxito.");
+                        mostrarToast("✅ Movimiento agregado con éxito.", 'success');
                         resolve();
                     })
                     .catch(error => {
                         console.error("Error al agregar movimiento:", error);
-                        alert("Error al guardar el movimiento.");
+                        mostrarToast("Error al guardar el movimiento.", 'danger');
                         reject(error);
                     });
             };
             reader.onerror = () => {
-                alert("❌ Error al leer el archivo.");
+                mostrarToast("❌ Error al leer el archivo.", 'danger');
                 reject(new Error("Error al leer el archivo"));
             };
             reader.readAsDataURL(file); // Convierte a base64
@@ -448,23 +814,27 @@ async function agregarMovimiento() {
         await renderizar();
         await actualizarSaldo();
         limpiarForm();
-        alert("✅ Movimiento agregado con éxito.");
+        mostrarToast("✅ Movimiento agregado con éxito.", 'success');
     }
   } catch (error) {
     console.error("Error al agregar movimiento:", error);
-    alert("Error al guardar el movimiento.");
+    mostrarToast("Error al guardar el movimiento.", 'danger');
   }
 }
 
 async function calcularSaldo() {
     const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+    
+    // ✅ MOSTRAR TODOS LOS MOVIMIENTOS (sin filtro por empresa)
+    let movimientosFiltrados = movimientos;
+    
     // ✅ Sumar solo las comisiones ya guardadas
-    const totalComisiones = movimientos
+    const totalComisiones = movimientosFiltrados
         .filter(m => m.tipo === 'gasto')
         .reduce((sum, m) => sum + m.comision, 0);
 
     // ✅ Calcular saldo base: ingresos - gastos (sin volver a calcular comisión)
-    const saldoBase = movimientos.reduce((acc, m) => {
+    const saldoBase = movimientosFiltrados.reduce((acc, m) => {
         if (m.tipo === 'gasto') {
             return acc - m.cantidad; // Solo el gasto real
         } else {
@@ -517,8 +887,11 @@ async function renderizar() {
     const filtro = document.getElementById('filtroBanco').value;
     const texto = document.getElementById('txtBuscar').value.trim().toLowerCase();
 
+    // ✅ MOSTRAR TODOS LOS MOVIMIENTOS (sin filtro por empresa)
+    let movimientosFiltrados = movimientos;
+
     // Filtrar movimientos reales
-    let listaFiltrada = movimientos.filter(m =>
+    let listaFiltrada = movimientosFiltrados.filter(m =>
         (filtro ? (m.banco || '(Sin banco)') === filtro : true) &&
         (texto ? (m.concepto + (m.categoria || '') + (m.banco || '')).toLowerCase().includes(texto) : true)
     );
@@ -527,8 +900,10 @@ async function renderizar() {
     listaFiltrada.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
     // Paginación
+    // Paginación
     const totalMovimientos = listaFiltrada.length;
     const totalPaginas = Math.ceil(totalMovimientos / MOVIMIENTOS_POR_PAGINA);
+    
     paginaActual = Math.min(paginaActual, totalPaginas || 1);
     paginaActual = Math.max(paginaActual, 1);
 
@@ -536,9 +911,22 @@ async function renderizar() {
     const fin = inicio + MOVIMIENTOS_POR_PAGINA;
     const movimientosPagina = listaFiltrada.slice(inicio, fin);
 
-    // Renderizar movimientos de la página actual
-    movimientosPagina.forEach(m => {
-        if (m.oculto) return;
+    const fragment = document.createDocumentFragment();
+
+    for (const m of movimientosPagina) {
+        if (m.oculto) continue;
+
+        let nombreEmpresa = 'Sin empresa';
+        if (m.empresaId !== undefined && m.empresaId !== null) {
+            try {
+                const empresa = await getEmpresa(m.empresaId);
+                if (empresa && empresa.nombre) {
+                    nombreEmpresa = empresa.nombre;
+                }
+            } catch (error) {
+                console.error('Error obteniendo empresa:', error);
+            }
+        }
 
         const li = document.createElement('li');
 
@@ -546,64 +934,95 @@ async function renderizar() {
         const conceptoBase = esSaldoInicial ? m.concepto.split(' (')[0] : m.concepto;
         const saldoInicialTexto = esSaldoInicial ? m.concepto.split(' (')[1]?.replace(')', '') : '';
 
-        // Calcular comisión si es gasto
         const esGasto = m.tipo === 'gasto';
         const comision = esGasto && m.comision !== undefined && !isNaN(m.comision) ? m.comision.toFixed(2) : null;
 
         li.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:.25rem; flex:1; margin-bottom: .5rem; min-width:0;">
-        <input type="text" value="${conceptoBase}" 
-                onblur="guardarCambio(${m.id}, 'concepto', this.value)"
-                onkeypress="if(event.key==='Enter') this.blur();"
-                style="width:100%; border:none; background:transparent; font:inherit; font-weight:600; color:var(--text);"
-                readonly>
-        ${saldoInicialTexto ? `<div style="font-size:.8rem; color:var(--text-light); margin-top:-.25rem; padding-left: 0.25rem;">(${saldoInicialTexto})</div>` : ''}
-        <div style="font-size:.75rem; color:var(--text-light); display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
-            <span>${m.categoria || 'Sin categoría'}</span>
-            <span>·</span>
-            <span>${m.banco || '(Sin banco)'}</span>
-            <span>·</span>
-            <span>${new Date(m.fecha).toLocaleDateString()}</span>
+    <div class="movimiento-card">
+        <!-- Header con tipo de movimiento e ícono -->
+        <div class="movimiento-header">
+            <div class="movimiento-tipo ${m.tipo}">
+                <span class="tipo-icon">${getMovementIcon(m.tipo)}</span>
+                <span class="tipo-label">${getMovementTypeLabel(m.tipo)}</span>
+            </div>
+            <div class="movimiento-fecha">
+                <span class="fecha-principal">${formatDate(m.fecha)}</span>
+                <span class="fecha-relativa">${getRelativeDate(m.fecha)}</span>
+            </div>
         </div>
-        ${comision ? `<div style="font-size:.8rem; color:#b00020; margin-top:0.25rem;">Comisión: ${comision} Bs</div>` : ''}
-    </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
-        <span style="font-weight:500; color:var(--text); font-size:1rem;">${formatNumberVE(m.cantidad)} Bs</span>
-        <button class="btn-editar" data-id="${m.id}" style="padding:.25rem; font-size:.8rem; background:#0b57d0; color:white; border-radius:50%; border:none; cursor:pointer; width:auto;">✏️</button>
 
-                ${m.recibo ? `
-            <div style="display:flex; justify-content:center; margin-top:0.5rem;">
-                <button onclick="verRecibo('${m.recibo}')" style="background:#0b57d0; color:white; border:none; border-radius:8px; padding:0.4rem 0.75rem; font-size:0.8rem; cursor:pointer; display:flex; align-items:center; gap:0.3rem;">
-                    📎 Ver recibo
+        <!-- Contenido principal -->
+        <div class="movimiento-contenido">
+            <div class="movimiento-info">
+                <h3 class="movimiento-concepto">${conceptoBase}</h3>
+                ${saldoInicialTexto ? `<div class="movimiento-saldo-inicial">${saldoInicialTexto}</div>` : ''}
+                <div class="movimiento-detalles">
+                    <span class="categoria-tag ${m.categoria ? 'categoria-activa' : 'categoria-vacia'}">
+                        <span class="categoria-icon">🏷️</span>
+                        ${m.categoria || 'Sin categoría'}
+                    </span>
+                    <span class="banco-tag">
+                        <span class="banco-icon">🏦</span>
+                        ${m.banco || '(Sin banco)'}
+                    </span>
+                    <span class="empresa-tag">
+                        <span class="empresa-icon">🏢</span>
+                        ${nombreEmpresa}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Cantidad destacada -->
+            <div class="movimiento-cantidad ${m.tipo}">
+                <span class="cantidad-valor">${displayNumber(m.cantidad, m.textoOriginal)} Bs</span>
+                ${comision ? `<div class="cantidad-comision">Comisión: ${comision} Bs</div>` : ''}
+            </div>
+        </div>
+
+        <!-- Footer con acciones -->
+        <div class="movimiento-footer">
+            ${m.recibo ? `
+                <button onclick="verRecibo('${m.recibo}')" class="btn-recibo">
+                    <span class="btn-icon">📎</span>
+                    Ver recibo
+                </button>
+            ` : ''}
+            <div class="acciones-principales">
+                <button class="btn-editar-mov" data-id="${m.id}">
+                    <span class="btn-icon">✏️</span>
+                </button>
+                <button class="btn-eliminar-mov" data-id="${m.id}">
+                    <span class="btn-icon">🗑️</span>
                 </button>
             </div>
-        ` : ''}
-
-        <button class="btn-eliminar" data-id="${m.id}" style="padding:.25rem; font-size:.8rem; background:#b00020; color:white; border-radius:50%; border:none; cursor:pointer; width:auto;">🗑️</button>
+        </div>
     </div>
 `;
-        ul.appendChild(li);
+
+        fragment.appendChild(li);
+    }
+
+    ul.appendChild(fragment);
+
+    // 
+    ul.querySelectorAll('.btn-editar-mov').forEach(button => {
+        button.addEventListener('click', e => {
+            const id = parseInt(e.target.closest('button').dataset.id);
+            cargarMovimientoParaEditar(id);
+        });
     });
 
-    // ✅ Añadir Event Listeners para los botones de editar y eliminar
- document.querySelectorAll('.btn-editar').forEach(button => {
-    button.addEventListener('click', e => {
-        const id = parseInt(e.target.dataset.id);
-        cargarMovimientoParaEditar(id);
+    ul.querySelectorAll('.btn-eliminar-mov').forEach(button => {
+        button.addEventListener('click', e => {
+            const id = parseInt(e.target.closest('button').dataset.id);
+            eliminarMovimiento(id);
+        });
     });
- });
 
- document.querySelectorAll('.btn-eliminar').forEach(button => {
-    button.addEventListener('click', e => {
-        const id = parseInt(e.target.dataset.id);
-        eliminarMovimiento(id);
-    });
- });
-
-    // Renderizar controles de paginación
+    // 
     renderizarControlesPaginacion(totalPaginas);
 
-    // Verificar si hay movimientos para mostrar el botón de reporte
+    // 
     const controlesReporte = document.getElementById('botonReporte');
     if (controlesReporte) {
         controlesReporte.style.display = totalMovimientos > 0 ? 'block' : 'none';
@@ -632,7 +1051,23 @@ function renderizarControlesPaginacion(totalPaginas) {
                     style="padding:0.3rem 0.6rem; font-size:0.875rem; background:#0b57d0; color:white; border:none; border-radius:4px; cursor:pointer;">
                 ◀ Anterior
             </button>
-            <span style="color:var(--text-light);">Página ${paginaActual} de ${totalPaginas}</span>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span style="color:var(--text-light);">Página</span>
+                <input type="number" 
+                       id="paginaInput" 
+                       min="1" 
+                       max="${totalPaginas}" 
+                       value="${paginaActual}" 
+                       style="width:60px; padding:0.3rem; text-align:center; border:1px solid var(--border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.875rem;"
+                       onkeypress="if(event.key === 'Enter') irAPaginaEspecifica(${totalPaginas})"
+                       title="Escribe el número de página y presiona Enter">
+                <span style="color:var(--text-light);">de ${totalPaginas}</span>
+                <button onclick="irAPaginaEspecifica(${totalPaginas})" 
+                        style="padding:0.3rem 0.6rem; font-size:0.875rem; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;"
+                        title="Ir a la página especificada">
+                    Ir
+                </button>
+            </div>
             <button onclick="cambiarPagina(${Math.min(totalPaginas, paginaActual + 1)})" ${paginaActual >= totalPaginas ? 'disabled' : ''} 
                     style="padding:0.3rem 0.6rem; font-size:0.875rem; background:#0b57d0; color:white; border:none; border-radius:4px; cursor:pointer;">
                 Siguiente ▶
@@ -644,6 +1079,37 @@ function renderizarControlesPaginacion(totalPaginas) {
 async function cambiarPagina(nuevaPagina) {
     paginaActual = nuevaPagina;
     await renderizar();
+
+    // ✅ Scroll automático hacia la lista de movimientos después de cambiar página
+    scrollToListaMovimientos();
+}
+
+// ✅ FUNCIÓN PARA IR A PÁGINA ESPECÍFICA
+async function irAPaginaEspecifica(totalPaginas) {
+    const input = document.getElementById('paginaInput');
+    const paginaDeseada = parseInt(input.value);
+    
+    // Validar que sea un número válido
+    if (isNaN(paginaDeseada)) {
+        alert('Por favor, ingresa un número de página válido.');
+        input.value = paginaActual;
+        return;
+    }
+    
+    // Validar que esté dentro del rango
+    if (paginaDeseada < 1 || paginaDeseada > totalPaginas) {
+        alert(`La página debe estar entre 1 y ${totalPaginas}.`);
+        input.value = paginaActual;
+        return;
+    }
+    
+    // Si es la misma página, no hacer nada
+    if (paginaDeseada === paginaActual) {
+        return;
+    }
+    
+    // Cambiar a la página deseada
+    await cambiarPagina(paginaDeseada);
 }
 
 async function borrar(id) {
@@ -673,6 +1139,9 @@ async function guardarCambio(id, campo, valor) {
 
 async function cargarSelectBancos() {
     const bancos = (await getAllEntries(STORES.BANCOS)).map(b => b.nombre);
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    bancos.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
     const select = document.getElementById('banco');
     // Conservamos "(Sin banco)" y "+ Nuevo..." si existen
     const sinBancoOpt = select.querySelector('option[value=""]');
@@ -694,6 +1163,8 @@ async function cargarSelectBancos() {
 async function renderizarResumenBancos() {
     const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
     const bancos = [...new Set(movimientos.map(m => (m.banco && typeof m.banco === 'string' ? m.banco : '(Sin banco)')))];
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    bancos.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
     const selectFiltro = document.getElementById('filtroBanco');
     const actual = selectFiltro.value;
@@ -905,6 +1376,7 @@ function limpiarForm() {
     document.getElementById('saldoInicial').value = '';
     document.getElementById('concepto').value = '';
     document.getElementById('cantidad').value = '';
+
     document.getElementById('tipo').value = 'ingreso';
     document.getElementById('categoria').value = '';
     document.getElementById('nuevaCategoria').value = '';
@@ -912,7 +1384,14 @@ function limpiarForm() {
     document.getElementById('banco').value = '';
     document.getElementById('nuevoBanco').value = '';
     document.getElementById('nuevoBanco').style.display = 'none';
-    
+    const selectorEmpresa = document.getElementById('empresaMovimiento');
+    if (selectorEmpresa) {
+        if (empresaActiva) {
+            selectorEmpresa.value = empresaActiva.id;
+        } else {
+            selectorEmpresa.value = '';
+        }
+    }
 
     // ✅ MANTENER LA FECHA ACTUAL EN EL CAMPO, NUNCA VACÍO
     const today = new Date().toISOString().split('T')[0];
@@ -933,7 +1412,535 @@ function mostrarSideTab(id) {
     document.getElementById('side-' + id).classList.add('active');
     document.querySelector(`[onclick="mostrarSideTab('${id}')"]`).classList.add('active');
     localStorage.setItem('agendaPestañaActiva', id);
+
+    // ✅ Reproducir sonido al cambiar de pestaña
+    reproducirSonidoCambioPestana();
+
+    // ✅ ACTUALIZAR DINÁMICAMENTE LA PESTAÑA ACTIVA
+    switch(id) {
+        case 'dashboard':
+            actualizarDashboard();
+            break;
+        case 'movimientos':
+            renderizar();
+            break;
+        case 'analisis':
+            actualizarGrafico();
+            actualizarBarChart();
+            renderizarResumenBancos();
+            break;
+        case 'presupuesto':
+            actualizarPresupuesto();
+            break;
+        case 'presupuesto-sugerido':
+                cargarCategoriasPresupuesto();
+                setTimeout(() => {
+                cargarPresupuestoSugeridoGuardado();
+                mostrarHistorialPresupuestos();
+                }, 300);
+        break;
+
+        case 'ahorro':
+            calcularAhorroMensual();
+            break;
+        case 'comparacion':
+            renderizarComparacionBancos();
+            break;
+        case 'herramientas':
+            // No necesita acción específica
+            break;
+        case 'calendario': // ✅ ¡NUEVO CASO! - Esto es lo que faltaba
+            renderizarCalendario();
+            break;
+        case 'inversiones':
+            renderizarInversiones();
+            break;
+        case 'deudas':
+            cargarDeudas();
+            break;
+        case 'empresas':
+            // ✅ SISTEMA MULTI-EMPRESA
+            renderizarEmpresas();
+            actualizarSelectorEmpresas();
+            actualizarSelectorEmpresaActiva();
+            break;
+        case 'config':
+            renderizarReglas(); // Cargar las reglas al mostrar la pestaña
+            renderizarCategoriasEditables(); // Cargar las categorías editables
+            renderizarBancosEditables(); // Cargar los bancos editables
+            cargarBackupsGuardados(); // ✅ Cargar los backups guardados automáticamente
+            break;
+        case 'cambios':
+                
+            break;
+
+        case 'recordatorios':
+            (async () => {
+                await renderizarRecordatoriosPestana();
+                })();
+                break;
+        // ✅ NUEVO: Caso para la pestaña "Notas"
+        case 'notas':
+            renderizarNotas(); // Cargar las notas al mostrar la pestaña
+            break;
+        default:
+            console.log(`Pestaña desconocida: ${id}`);
+        
+        case 'asistente-ia':
+            // No necesita cargar datos específicos, solo mostrar la interfaz
+            break;
+
+        case 'proveedores-pagos':
+            renderizarPagos(); // Cargar los pagos al mostrar la pestaña
+            renderizarGraficoProveedores(); // Cargar el gráfico
+        break;
+
+        case 'inventario-activos':
+            renderizarActivos(); // Cargar los activos al mostrar la pestaña
+        break;
+
+        case 'reportes-gerenciales':
+            // No necesita cargar datos específicos, solo mostrar la interfaz
+        break;
+
+        case 'asistente-financiero':
+            renderizarReglasAsistente(); // Cargar las reglas al mostrar la pestaña
+
+                // ✅ Cargar el estado del checkbox desde localStorage
+            const mostrarTodasGuardado = localStorage.getItem('mostrarTodasCategorias');
+            if (mostrarTodasGuardado !== null) {
+                document.getElementById('mostrarTodasCategorias').checked = mostrarTodasGuardado === 'true';
+                // Actualizar el select con el estado cargado
+                actualizarSelectCategoriasAsistente();
+            }
+
+        break;
+    }
+
+    // ✅ MOSTRAR VERSIÓN EN EL PANEL DE CONFIGURACIÓN
+    const versionElementConfig = document.getElementById('versionConfig');
+    if (versionElementConfig) {
+        versionElementConfig.textContent = APP_VERSION;
+    }
+
+    if (id === 'presupuesto-sugerido') {
+    cargarCategoriasPresupuesto();
 }
+
+}
+
+// ======================================================================================
+// ✅ BUSCADOR MEJORADO DE MOVIMIENTOS
+// ======================================================================================
+
+/**
+ * Función mejorada para buscar movimientos en tiempo real
+ * Busca en concepto, categoría, banco, monto, fecha y tipo
+ */
+async function buscarMovimientos() {
+    const query = document.getElementById('buscadorMovimientos').value.toLowerCase().trim();
+    
+    if (!query) {
+        renderizar();
+        ocultarContadorBusqueda();
+        return;
+    }
+
+    try {
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readonly');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+        const request = store.getAll();
+
+        request.onsuccess = async function(event) {
+            const movimientos = event.target.result;
+            
+            // ✅ MOSTRAR TODOS LOS MOVIMIENTOS (sin filtro por empresa)
+            let movimientosFiltrados = movimientos;
+            
+            const resultados = movimientosFiltrados.filter(movimiento => {
+                return coincideConBusqueda(movimiento, query);
+            });
+
+            await mostrarResultadosBusqueda(resultados, query);
+        };
+
+        request.onerror = function() {
+            mostrarToast('❌ Error al buscar movimientos', 'danger');
+        };
+
+    } catch (error) {
+        mostrarToast('❌ Error en la búsqueda: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * Verifica si un movimiento coincide con la búsqueda
+ */
+function coincideConBusqueda(movimiento, query) {
+    // Buscar en concepto (prioridad alta)
+    if (movimiento.concepto && movimiento.concepto.toLowerCase().includes(query)) {
+        return true;
+    }
+
+    // Buscar en categoría
+    if (movimiento.categoria && movimiento.categoria.toLowerCase().includes(query)) {
+        return true;
+    }
+
+    // Buscar en banco (prioridad alta para tu caso)
+    if (movimiento.banco && movimiento.banco.toLowerCase().includes(query)) {
+        return true;
+    }
+
+    // Buscar en tipo
+    if (movimiento.tipo && movimiento.tipo.toLowerCase().includes(query)) {
+        return true;
+    }
+
+    // Buscar en monto (números)
+    if (query.match(/^\d/)) {
+        const montoStr = movimiento.cantidad.toString();
+        if (montoStr.includes(query.replace(/[.,]/g, ''))) {
+            return true;
+        }
+    }
+
+    // Buscar en fecha
+    if (movimiento.fecha) {
+        const fecha = new Date(movimiento.fecha);
+        const fechaStr = fecha.toLocaleDateString('es-ES');
+        if (fechaStr.toLowerCase().includes(query)) {
+            return true;
+        }
+        
+        // Buscar por componentes individuales
+        if (fecha.getDate().toString().includes(query) || 
+            (fecha.getMonth() + 1).toString().includes(query) ||
+            fecha.getFullYear().toString().includes(query)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Mostrar resultados de búsqueda
+ */
+async function mostrarResultadosBusqueda(resultados, query) {
+    const listaMovimientos = document.getElementById('listaMovimientos');
+    
+    if (resultados.length === 0) {
+        listaMovimientos.innerHTML = generarMensajeSinResultados(query);
+        mostrarContadorBusqueda(0, query);
+        return;
+    }
+
+    // ✅ Generar HTML para cada movimiento de forma asíncrona
+    const htmlPromises = resultados.map(movimiento => generarHTMLMovimiento(movimiento, query));
+    const htmlArray = await Promise.all(htmlPromises);
+    
+    listaMovimientos.innerHTML = htmlArray.join('');
+    mostrarContadorBusqueda(resultados.length, query);
+}
+
+/**
+ * Generar HTML para un movimiento con resaltado
+ */
+async function generarHTMLMovimiento(movimiento, query) {
+    const fecha = new Date(movimiento.fecha);
+    const fechaFormateada = fecha.toLocaleDateString('es-ES');
+    const montoFormateado = formatNumberVE(movimiento.cantidad);
+    const tipoIcon = movimiento.tipo === 'ingreso' ? '💰' : '💸';
+    const tipoClass = movimiento.tipo === 'ingreso' ? 'tipo-ingreso' : 'tipo-gasto';
+
+    // ✅ OBTENER NOMBRE DE EMPRESA
+    let nombreEmpresa = 'Sin empresa';
+    if (movimiento.empresaId) {
+        try {
+            const empresa = await getEmpresa(movimiento.empresaId);
+            if (empresa) {
+                nombreEmpresa = empresa.nombre;
+            }
+        } catch (error) {
+            console.error('Error obteniendo empresa:', error);
+        }
+    }
+
+    return `
+        <li class="movimiento-item" data-id="${movimiento.id}">
+            <div class="movimiento-header">
+                <span class="movimiento-tipo ${tipoClass}">${tipoIcon} ${movimiento.tipo.toUpperCase()}</span>
+                <span class="movimiento-fecha">${fechaFormateada}</span>
+            </div>
+            <div class="movimiento-contenido">
+                <div class="movimiento-concepto">${resaltarCoincidencia(movimiento.concepto || 'Sin concepto', query)}</div>
+                <div class="movimiento-detalles">
+                    <span class="movimiento-categoria">🏷️ ${resaltarCoincidencia(movimiento.categoria || 'Sin categoría', query)}</span>
+                    <span class="movimiento-banco">🏦 ${resaltarCoincidencia(movimiento.banco || 'Sin banco', query)}</span>
+                    <span class="movimiento-empresa">🏢 ${resaltarCoincidencia(nombreEmpresa, query)}</span>
+                </div>
+            </div>
+            <div class="movimiento-monto ${tipoClass}">
+                ${tipoIcon} ${montoFormateado}
+            </div>
+            <div class="movimiento-acciones">
+                <button onclick="cargarMovimientoParaEditar(${movimiento.id})" class="btn-editar" title="Editar">✏️</button>
+                <button onclick="eliminarMovimiento(${movimiento.id})" class="btn-eliminar" title="Eliminar">🗑️</button>
+            </div>
+        </li>
+    `;
+}
+
+/**
+ * Generar mensaje cuando no hay resultados
+ */
+function generarMensajeSinResultados(query) {
+    return `
+        <div style="text-align: center; padding: 2rem; color: var(--text-light);">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+            <h3>No se encontraron resultados</h3>
+            <p>No hay movimientos que coincidan con: <strong>"${query}"</strong></p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--info);">
+                <p style="margin: 0; color: var(--info-text); font-size: 0.9rem;">
+                    💡 <strong>Consejos de búsqueda:</strong><br>
+                    - Busca por nombre del banco<br>
+                    - Escribe parte del concepto<br>
+                    - Busca por monto aproximado<br>
+                    - Usa fechas (día/mes/año)<br>
+                    - Prueba términos más cortos
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Resaltar texto que coincide con la búsqueda
+ */
+function resaltarCoincidencia(texto, query) {
+    if (!query || !texto || !texto.toLowerCase().includes(query.toLowerCase())) {
+        return texto;
+    }
+    
+    const regex = new RegExp(`(${query})`, 'gi');
+    return texto.replace(regex, '<mark style="background: #ffeb3b; color: #333; padding: 2px 4px; border-radius: 3px;">$1</mark>');
+}
+
+/**
+ * Mostrar contador de resultados de búsqueda
+ */
+function mostrarContadorBusqueda(cantidad, query) {
+    let contador = document.getElementById('contadorBusqueda');
+    if (!contador) {
+        contador = document.createElement('div');
+        contador.id = 'contadorBusqueda';
+        contador.style.cssText = `
+            background: var(--primary-bg);
+            color: var(--primary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            text-align: center;
+            border: 2px solid var(--primary);
+        `;
+        
+        const buscador = document.getElementById('buscadorMovimientos');
+        buscador.parentNode.insertBefore(contador, buscador.nextSibling);
+    }
+
+    if (cantidad === 0) {
+        contador.style.display = 'none';
+    } else {
+        contador.innerHTML = `🔍 <strong>${cantidad}</strong> resultados para "<strong>${query}</strong>"`;
+        contador.style.display = 'block';
+    }
+}
+
+/**
+ * Ocultar contador de búsqueda
+ */
+function ocultarContadorBusqueda() {
+    const contador = document.getElementById('contadorBusqueda');
+    if (contador) {
+        contador.style.display = 'none';
+    }
+}
+
+/**
+ * Función auxiliar para formateo de números venezolano
+ */
+function formatNumberVE(numero) {
+    if (typeof numero !== 'number') {
+        numero = parseFloat(numero) || 0;
+    }
+    
+    return numero.toLocaleString('es-VE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// ======================================================================================
+// FIN DE BUSCADOR MEJORADO DE MOVIMIENTOS
+// ======================================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    const buscadorMovimientos = document.getElementById('buscadorMovimientos');
+    if (buscadorMovimientos) {
+        buscadorMovimientos.addEventListener('input', buscarMovimientos);
+        buscadorMovimientos.addEventListener('paste', function() {
+            setTimeout(buscarMovimientos, 10);
+        });
+    }
+});
+
+// ✅ Función para mostrar resultado de búsqueda
+function mostrarResultadoBusquedaMovimientos(encontrados) {
+    const buscador = document.getElementById('buscadorMovimientos');
+    const placeholder = document.getElementById('placeholderBusqueda');
+    
+    if (!buscador) return;
+
+    if (terminoBusquedaMovimientos && encontrados === 0) {
+        buscador.style.borderColor = 'var(--danger)';
+        buscador.placeholder = '❌ No se encontraron movimientos...';
+    } else {
+        buscador.style.borderColor = '';
+        buscador.placeholder = '🔍 Buscar movimientos por concepto, categoría o banco...';
+    }
+}
+
+// ======================================================================================
+// 🎯 MEJORAS PARA NAVEGACIÓN DEL MENÚ LATERAL
+// ======================================================================================
+
+// Sistema mejorado para el menú lateral existente
+class SidebarManager {
+    constructor() {
+        this.searchTerm = '';
+        this.init();
+    }
+
+    init() {
+        this.setupSearch();
+        this.setupKeyboardShortcuts();
+        this.setupTabNavigation();
+    }
+
+    // Configurar búsqueda en el menú
+    setupSearch() {
+        const searchInput = document.getElementById('navSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.searchTerm = e.target.value.toLowerCase();
+                this.filterTabs();
+            });
+
+            // Buscar también al pegar
+            searchInput.addEventListener('paste', () => {
+                setTimeout(() => this.filterTabs(), 10);
+            });
+        }
+    }
+
+    // Filtrar pestañas según búsqueda
+    filterTabs() {
+        const tabs = document.querySelectorAll('.side-tab');
+        let visibleCount = 0;
+
+        tabs.forEach(tab => {
+            const text = tab.textContent.toLowerCase();
+            const shouldShow = !this.searchTerm || text.includes(this.searchTerm);
+
+            if (shouldShow) {
+                tab.style.display = 'block';
+                tab.style.opacity = '1';
+                tab.style.transform = 'scale(1)';
+                visibleCount++;
+            } else {
+                tab.style.display = 'none';
+                tab.style.opacity = '0.3';
+                tab.style.transform = 'scale(0.95)';
+            }
+        });
+
+        // Mostrar resultado de búsqueda
+        this.showSearchResults(visibleCount);
+    }
+
+    // Mostrar resultados de búsqueda
+    showSearchResults(count) {
+        const searchInput = document.getElementById('navSearch');
+        if (this.searchTerm && count === 0) {
+            searchInput.style.borderColor = 'var(--danger)';
+            searchInput.placeholder = '❌ No encontrado...';
+        } else {
+            searchInput.style.borderColor = '';
+            searchInput.placeholder = '🔍Buscar pestañas...';
+        }
+    }
+
+    // Atajos de teclado mejorados
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Solo si no estamos en input/textarea
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            const key = e.key.toLowerCase();
+            const shortcuts = {
+                'd': 'dashboard',
+                'm': 'movimientos',
+                'a': 'analisis',
+                'p': 'presupuesto',
+                'h': 'herramientas',
+                'c': 'calendario',
+                'i': 'inversiones',
+                'u': 'deudas',
+                'g': 'config',
+                'b': 'cambios'
+            };
+
+            if (shortcuts[key] && !e.ctrlKey && !e.altKey) {
+                e.preventDefault();
+                mostrarSideTab(shortcuts[key]);
+                mostrarToast(`⚡ ${shortcuts[key]}`, 'info');
+            }
+
+            // Ctrl+K para focus en búsqueda del menú
+            if (e.ctrlKey && key === 'k') {
+                e.preventDefault();
+                const searchInput = document.getElementById('navSearch');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }
+        });
+    }
+
+    // Mejorar navegación de pestañas
+    setupTabNavigation() {
+        document.querySelectorAll('.side-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Limpiar búsqueda después de seleccionar
+                const searchInput = document.getElementById('navSearch');
+                if (searchInput) {
+                    searchInput.value = '';
+                    this.searchTerm = '';
+                    this.filterTabs();
+                }
+            });
+        });
+    }
+}
+
+// Inicializar mejoras del menú lateral
+document.addEventListener('DOMContentLoaded', function() {
+    window.sidebarManager = new SidebarManager();
+});
 
 function actualizarEquivalente() {
     // 1. Obtener saldo actual (ya formateado en Bs.)
@@ -946,6 +1953,7 @@ function actualizarEquivalente() {
         document.getElementById('tasaActual').textContent = 'Tasa actual: 1 USD = 0,00 Bs';
         return;
     }
+
     // 2. Obtener tasa del input (tal cual, sin tocar nada)
     const inputTasa = document.getElementById('tasaCambio').value.trim();
     let tasa;
@@ -956,14 +1964,17 @@ function actualizarEquivalente() {
         const cleanedTasa = inputTasa.replace(/\./g, '').replace(',', '.');
         tasa = parseFloat(cleanedTasa);
     }
+
     // 3. Validar y calcular
     if (isNaN(tasa) || tasa <= 0) {
         document.getElementById('equivalente').textContent = 'Tasa inválida';
         document.getElementById('tasaActual').textContent = 'Tasa actual: 1 USD = 0,00 Bs';
         return;
     }
+
     // 4. Calcular equivalente
     const equivalente = saldoBs / tasa;
+
     // 5. Determinar moneda y símbolo
     const monedaDestino = document.getElementById('monedaDestino').value;
     let simbolo = '$';
@@ -972,11 +1983,19 @@ function actualizarEquivalente() {
     if (monedaDestino === 'COP') { simbolo = 'COL$'; nombreMoneda = 'COP'; }
     if (monedaDestino === 'ARS') { simbolo = 'ARS$'; nombreMoneda = 'ARS'; }
     if (monedaDestino === 'MXN') { simbolo = 'MX$'; nombreMoneda = 'MXN'; }
-    // 6. Formatear equivalente en formato venezolano
-    const formatoEquivalente = formatNumberVE(equivalente);
+
+    // ✅ 6. FORMATEAR EL EQUIVALENTE COMO QUIERES: 5.030,01
+    // Convertir a string con 2 decimales
+    const equivalenteStr = equivalente.toFixed(2); // "5030.01"
+    const partes = equivalenteStr.split('.');
+    const entera = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.'); // "5.030"
+    const decimal = partes[1] ? ',' + partes[1] : ''; // ",01"
+    const formatoEquivalente = entera + decimal; // "5.030,01"
+
     // 7. Mostrar resultados
     document.getElementById('equivalente').textContent = `${simbolo} ${formatoEquivalente}`;
     document.getElementById('tasaActual').textContent = `Tasa actual: 1 ${nombreMoneda} = ${formatNumberVE(tasa)} Bs`;
+
     // ✅ GUARDAR LA TASA EN localStorage PARA QUE NO SE PIERDA
     localStorage.setItem('tasaCambio', inputTasa); // ✅ Guardamos el TEXTO ORIGINAL
 }
@@ -1012,6 +2031,9 @@ async function agregarCategoria() {
 
 async function actualizarSelectCategorias() {
     const cats = (await getAllEntries(STORES.CATEGORIAS)).map(c => c.nombre);
+    // ✅ ORDENAR ALFABÉTICAMENTE (ignorando mayúsculas/minúsculas)
+    cats.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
     const select = document.getElementById('categoria');
     const optOtro = select.options[select.options.length - 1];
     while (select.options.length > 2) select.remove(1);
@@ -1059,6 +2081,9 @@ async function eliminarCategoria() {
 async function cargarSelectEliminarCategorias() {
     const select = document.getElementById('selectEliminarCategoria');
     const categorias = (await getAllEntries(STORES.CATEGORIAS)).map(c => c.nombre);
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    categorias.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
     while (select.options.length > 1) {
         select.remove(1);
     }
@@ -1068,6 +2093,7 @@ async function cargarSelectEliminarCategorias() {
         opt.textContent = cat;
         select.appendChild(opt);
     });
+    
     const botonEliminar = document.querySelector('[onclick="eliminarCategoria()"]');
     if (categorias.length === 0) {
         botonEliminar.disabled = true;
@@ -1136,6 +2162,9 @@ async function eliminarBanco() {
 async function cargarSelectEliminarBancos() {
     const select = document.getElementById('selectEliminarBanco');
     const bancos = (await getAllEntries(STORES.BANCOS)).map(b => b.nombre);
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    bancos.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
     while (select.options.length > 1) {
         select.remove(1);
     }
@@ -1150,6 +2179,9 @@ async function cargarSelectEliminarBancos() {
 async function cargarSelectBancoRegla() {
     const select = document.getElementById('txtBancoRegla');
     const bancos = (await getAllEntries(STORES.BANCOS)).map(b => b.nombre);
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    bancos.sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+    
     const cualquierBanco = select.options[0];
     const nuevoOpt = select.options[select.options.length - 1];
     select.innerHTML = '';
@@ -1277,7 +2309,7 @@ async function actualizarPresupuesto() {
     }
 
     // Renderizar detalles
-    renderizarDetallesPresupuesto(gastosUltimos30Dias);
+    renderizarPresupuestoTarjetas();
 }
 
 function renderizarDetallesPresupuesto(gastos) {
@@ -1375,6 +2407,9 @@ function cerrarModalReporte() {
 
 async function mostrarSeleccionCategoria() {
     const categorias = await getAllEntries(STORES.CATEGORIAS);
+    // ✅ ORDENAR ALFABÉTICAMENTE
+    categorias.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    
     const select = document.getElementById('selectCategoriaReporte');
     select.innerHTML = '<option value="">Selecciona una categoría</option>';
     categorias.forEach(c => {
@@ -1390,6 +2425,57 @@ async function mostrarSeleccionCategoria() {
 function cerrarFormCategoria() {
     document.getElementById('formCategoria').style.display = 'none';
     document.getElementById('modalReporte').style.display = 'flex';
+}
+
+async function mostrarSeleccionEmpresa() {
+    const empresas = await getAllEmpresas();
+    
+    const select = document.getElementById('selectEmpresaReporte');
+    select.innerHTML = '<option value="">Selecciona una empresa</option>';
+    empresas.forEach(empresa => {
+        const opt = document.createElement('option');
+        opt.value = empresa.id;
+        opt.textContent = empresa.nombre;
+        select.appendChild(opt);
+    });
+    document.getElementById('formEmpresa').style.display = 'block';
+    document.getElementById('modalReporte').style.display = 'none';
+}
+
+function cerrarFormEmpresa() {
+    document.getElementById('formEmpresa').style.display = 'none';
+    document.getElementById('modalReporte').style.display = 'flex';
+    limpiarFormularioReporteEmpresa();
+}
+
+function limpiarFormularioReporteEmpresa() {
+    const selectEmpresa = document.getElementById('selectEmpresaReporte');
+    if (selectEmpresa) {
+        if (selectEmpresa.options.length > 0) {
+            selectEmpresa.selectedIndex = 0;
+        }
+        selectEmpresa.value = '';
+    }
+
+    const fechaDesdeInput = document.getElementById('fechaDesdeEmpresa');
+    if (fechaDesdeInput) {
+        fechaDesdeInput.value = '';
+    }
+
+    const fechaHastaInput = document.getElementById('fechaHastaEmpresa');
+    if (fechaHastaInput) {
+        fechaHastaInput.value = '';
+    }
+
+    const detallePorDefecto = document.querySelector('input[name="nivelDetalle"][value="resumen"]');
+    if (detallePorDefecto) {
+        detallePorDefecto.checked = true;
+    }
+
+    const formatoPorDefecto = document.querySelector('input[name="formatoExportacion"][value="imprimir"]');
+    if (formatoPorDefecto) {
+        formatoPorDefecto.checked = true;
+    }
 }
 
 function mostrarSeleccionFecha() {
@@ -1436,12 +2522,473 @@ function generarReportePorFecha() {
     generarReporteBase(null, { desde, hasta }, `Reporte por Fecha: ${new Date(desde).toLocaleDateString()} a ${new Date(hasta).toLocaleDateString()}`);
 }
 
-// ✅ FUNCIÓN UNIFICADA PARA GENERAR CUALQUIER TIPO DE REPORTE (General, por Categoría, por Fecha)
+// ✅ Función para Reporte por Empresa
+function generarReportePorEmpresa() {
+    const empresaId = document.getElementById('selectEmpresaReporte').value;
+    
+    if (!empresaId) {
+        mostrarToast('❌ Por favor, selecciona una empresa', 'danger');
+        return;
+    }
+
+    const fechaDesde = document.getElementById('fechaDesdeEmpresa').value;
+    const fechaHasta = document.getElementById('fechaHastaEmpresa').value;
+    let rangoFechas = null;
+
+    if (fechaDesde || fechaHasta) {
+        if (!fechaDesde || !fechaHasta) {
+            mostrarToast('❌ Debes seleccionar ambas fechas para filtrar por rango', 'danger');
+            return;
+        }
+
+        const fechaDesdeDate = new Date(fechaDesde);
+        const fechaHastaDate = new Date(fechaHasta);
+
+        if (fechaDesdeDate > fechaHastaDate) {
+            mostrarToast('❌ La fecha "Desde" no puede ser mayor que la fecha "Hasta"', 'danger');
+            return;
+        }
+
+        rangoFechas = { desde: fechaDesde, hasta: fechaHasta };
+    }
+
+    // Obtener el nombre de la empresa para el título
+    const select = document.getElementById('selectEmpresaReporte');
+    const empresaNombre = select.options[select.selectedIndex].text;
+
+    // Obtener opciones seleccionadas
+    const nivelDetalle = document.querySelector('input[name="nivelDetalle"]:checked').value;
+    const formatoExportacion = document.querySelector('input[name="formatoExportacion"]:checked').value;
+    
+    generarReportePorEmpresaBase(empresaId, empresaNombre, nivelDetalle, formatoExportacion, rangoFechas);
+}
+
+// ✅ Función base para generar reporte por empresa específica
+async function generarReportePorEmpresaBase(empresaId, empresaNombre, nivelDetalle, formatoExportacion, rangoFechas = null) {
+    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+    const tasaCambio = parseFloat(document.getElementById('tasaCambio').value) || 0;
+
+    // Filtrar movimientos por empresa
+    let movimientosFiltrados = movimientos.filter(m => {
+        return m.empresaId == empresaId; // Usar == para comparar string con number
+    });
+
+    if (movimientosFiltrados.length === 0) {
+        mostrarToast('❌ No hay movimientos para esta empresa', 'danger');
+        return;
+    }
+
+    if (rangoFechas) {
+        const fechaDesde = new Date(rangoFechas.desde);
+        const fechaHasta = new Date(rangoFechas.hasta);
+
+        movimientosFiltrados = movimientosFiltrados.filter(m => {
+            const fechaMovimiento = new Date(m.fecha);
+            return fechaMovimiento >= fechaDesde && fechaMovimiento <= fechaHasta;
+        });
+
+        if (movimientosFiltrados.length === 0) {
+            mostrarToast('❌ No hay movimientos para esta empresa en el rango seleccionado', 'danger');
+            return;
+        }
+    }
+
+    // Agrupar movimientos por banco
+    const bancos = [...new Set(movimientosFiltrados.map(m => m.banco || '(Sin banco)'))];
+    const resumenBancos = {};
+
+    bancos.forEach(banco => {
+        const movimientosBanco = movimientosFiltrados.filter(m => (m.banco || '(Sin banco)') === banco);
+        
+        const ingresos = movimientosBanco
+            .filter(m => m.tipo === 'ingreso')
+            .reduce((sum, m) => sum + m.cantidad, 0);
+        
+        const gastos = movimientosBanco
+            .filter(m => m.tipo === 'gasto')
+            .reduce((sum, m) => sum + m.cantidad, 0);
+        
+        const saldo = ingresos - gastos;
+        
+        resumenBancos[banco] = { ingresos, gastos, saldo, movimientos: movimientosBanco };
+    });
+
+    // Generar reporte HTML para impresión
+    generarReporteHTML(empresaNombre, resumenBancos, nivelDetalle, tasaCambio);
+
+    mostrarToast(`✅ Reporte generado para "${empresaNombre}" con ${movimientosFiltrados.length} movimientos`, 'success');
+    
+    // Cerrar el formulario de selección
+    cerrarFormEmpresa();
+}
+
+// ✅ Función para mostrar vista previa del logo
+function vistaPreviaLogo(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            document.getElementById('vistaPreviaLogo').src = e.target.result;
+            document.getElementById('vistaPreviaLogoContainer').style.display = 'block';
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// ✅ Función para eliminar el logo seleccionado
+function eliminarLogo() {
+    document.getElementById('empresaLogo').value = '';
+    document.getElementById('vistaPreviaLogoContainer').style.display = 'none';
+    document.getElementById('vistaPreviaLogo').src = '';
+}
+
+// ✅ Función para generar reporte en formato HTML (para imprimir)
+async function generarReporteHTML(empresaNombre, resumenBancos, nivelDetalle, tasaCambio) {
+    const empresas = await getAllEmpresas();
+    const empresa = empresas.find(emp => emp.nombre === empresaNombre);
+    const logoUrl = empresa && empresa.logo ? empresa.logo : '';
+    const fechaGeneracion = new Date();
+    const fechaTexto = fechaGeneracion.toLocaleDateString('es-VE');
+    const horaTexto = fechaGeneracion.toLocaleTimeString('es-VE');
+
+    let totalIngresos = 0;
+    let totalGastos = 0;
+
+    let contenido = `
+        <div class="reporte-contenedor">
+            <header class="reporte-encabezado">
+                ${logoUrl ? `
+                    <div class="reporte-logo">
+                        <img src="${logoUrl}" alt="Logo de ${empresaNombre}" onerror="this.style.display='none';">
+                    </div>
+                ` : '<div class="reporte-logo"></div>'}
+                <div class="reporte-titulos">
+                    <h1>${empresaNombre}</h1>
+                    <p class="reporte-fecha">Reporte financiero — ${fechaTexto} ${horaTexto ? `a las ${horaTexto}` : ''}</p>
+                </div>
+                <div class="reporte-logo-placeholder"></div>
+            </header>
+
+            <section class="reporte-seccion">
+                <h2>📈 Resumen por banco</h2>
+                <table class="tabla-resumen">
+                    <thead>
+                        <tr>
+                            <th>Banco</th>
+                            <th>Ingresos</th>
+                            <th>Gastos</th>
+                            <th>Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    Object.entries(resumenBancos).forEach(([banco, datos]) => {
+        const ingresosFormateados = formatNumberVE(datos.ingresos);
+        const gastosFormateados = formatNumberVE(datos.gastos);
+        const saldoFormateado = formatNumberVE(datos.saldo);
+        const saldoColor = datos.saldo >= 0 ? 'positivo' : 'negativo';
+
+        totalIngresos += datos.ingresos;
+        totalGastos += datos.gastos;
+
+        contenido += `
+            <tr>
+                <td class="celda-banco">${banco}</td>
+                <td class="celda-monto positivo">${ingresosFormateados} Bs</td>
+                <td class="celda-monto negativo">${gastosFormateados} Bs</td>
+                <td class="celda-monto ${saldoColor}">${saldoFormateado} Bs</td>
+            </tr>
+        `;
+    });
+
+    const totalSaldo = totalIngresos - totalGastos;
+    const totalSaldoColor = totalSaldo >= 0 ? 'positivo' : 'negativo';
+
+    contenido += `
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th>TOTAL</th>
+                            <th class="positivo">${formatNumberVE(totalIngresos)} Bs</th>
+                            <th class="negativo">${formatNumberVE(totalGastos)} Bs</th>
+                            <th class="${totalSaldoColor}">${formatNumberVE(totalSaldo)} Bs</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+    `;
+
+    if (nivelDetalle === 'completo') {
+        const bancos = Object.keys(resumenBancos);
+        contenido += `
+            <section class="reporte-seccion">
+                <h2>📋 Detalle de movimientos</h2>
+        `;
+
+        bancos.forEach((banco, index) => {
+            const datos = resumenBancos[banco];
+            const bloqueClase = index > 0 ? 'detalle-banco page-break' : 'detalle-banco';
+
+            contenido += `
+                <div class="${bloqueClase}">
+                    <h3>🏦 ${banco}</h3>
+                    <table class="tabla-detalle">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Concepto</th>
+                                <th>Categoría</th>
+                                <th>Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            datos.movimientos
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+                .forEach(mov => {
+                    const fecha = new Date(mov.fecha).toLocaleDateString('es-VE');
+                    const montoFormateado = formatNumberVE(mov.cantidad);
+                    const montoClase = mov.tipo === 'ingreso' ? 'positivo' : 'negativo';
+                    const signo = mov.tipo === 'ingreso' ? '+' : '-';
+
+                    contenido += `
+                            <tr>
+                                <td>${fecha}</td>
+                                <td>${mov.concepto}</td>
+                                <td>${mov.categoria || 'Sin categoría'}</td>
+                                <td class="${montoClase}">${signo} ${montoFormateado} Bs</td>
+                            </tr>
+                    `;
+                });
+
+            contenido += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        contenido += `
+            </section>
+        `;
+    }
+
+    if (tasaCambio > 0) {
+        const totalUSD = totalSaldo / tasaCambio;
+        contenido += `
+            <section class="reporte-seccion">
+                <div class="equivalencia-cambio">
+                    <h3>💱 Equivalencia en dólares</h3>
+                    <p><strong>Total:</strong> ${formatNumberVE(totalSaldo)} Bs ≈ ${formatNumberVE(totalUSD)} USD</p>
+                    <p class="tasa">Tasa de cambio utilizada: ${formatNumberVE(tasaCambio)} Bs/USD</p>
+                </div>
+            </section>
+        `;
+    }
+
+    contenido += '</div>';
+
+    const estilos = `
+        :root { color-scheme: only light; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #ffffff;
+            font-family: 'Roboto', Arial, sans-serif;
+            color: #1f1f1f;
+        }
+        .reporte-contenedor {
+            padding: 32px 28px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .reporte-encabezado {
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .reporte-logo img {
+            max-width: 180px;
+            max-height: 90px;
+            object-fit: contain;
+        }
+        .reporte-titulos {
+            text-align: center;
+        }
+        .reporte-titulos h1 {
+            margin: 0;
+            font-size: 1.9rem;
+            font-weight: 600;
+            color: #1f1f1f;
+        }
+        .reporte-fecha {
+            margin: 10px 0 0;
+            color: #5f6368;
+            font-size: 0.95rem;
+        }
+        .reporte-seccion {
+            margin-bottom: 36px;
+        }
+        .reporte-seccion h2 {
+            font-size: 1.35rem;
+            color: #202124;
+            border-bottom: 2px solid #dfe1e5;
+            padding-bottom: 10px;
+            margin: 0 0 18px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 28px;
+        }
+        th, td {
+            border: 1px solid #dfe1e5;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            text-align: left;
+        }
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #1f1f1f;
+        }
+        .tabla-resumen tfoot th {
+            background: #e8f0fe;
+            font-size: 1rem;
+        }
+        .celda-banco {
+            font-weight: 600;
+        }
+        .celda-monto,
+        .tabla-detalle td:last-child,
+        .tabla-resumen th:nth-child(n+2),
+        .tabla-resumen td:nth-child(n+2) {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .positivo { color: #0f9d58; }
+        .negativo { color: #d93025; }
+        .detalle-banco {
+            margin-bottom: 28px;
+        }
+        .detalle-banco h3 {
+            margin: 0 0 14px;
+            font-size: 1.15rem;
+            color: #3c4043;
+        }
+        .tabla-detalle tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        .equivalencia-cambio {
+            background: #f0f8ff;
+            border-left: 4px solid #1a73e8;
+            padding: 18px 20px;
+            border-radius: 8px;
+        }
+        .equivalencia-cambio h3 {
+            margin: 0 0 12px;
+            color: #1a73e8;
+        }
+        .equivalencia-cambio p {
+            margin: 6px 0;
+        }
+        .equivalencia-cambio .tasa {
+            color: #5f6368;
+            font-size: 0.9rem;
+        }
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            @page {
+                size: A4;
+                margin: 18mm 14mm;
+            }
+            .reporte-contenedor {
+                padding: 0;
+            }
+            .reporte-encabezado {
+                margin-bottom: 24px;
+            }
+            .reporte-seccion {
+                margin-bottom: 30px;
+            }
+            h1, h2, h3 {
+                page-break-after: avoid;
+                break-after: avoid;
+            }
+            table {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .detalle-banco {
+                page-break-inside: avoid;
+            }
+            .page-break {
+                page-break-before: always;
+                break-before: page;
+            }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+        }
+    `;
+
+    const tituloDocumento = `Reporte ${empresaNombre}`;
+    const slug = empresaNombre
+        .toString()
+        .normalize('NFD')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'reporte-empresa';
+    const nombreArchivo = `reporte-${slug}.html`;
+
+    const scriptInline = `(() => {
+        document.title = ${JSON.stringify(tituloDocumento)};
+        try { history.replaceState(null, document.title, ${JSON.stringify(nombreArchivo)}); } catch (error) { console.warn('No se pudo ajustar la URL del reporte:', error); }
+        window.addEventListener('load', () => {
+            setTimeout(() => window.print(), 400);
+        });
+    })();`;
+
+    const docHTML = `<!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>${tituloDocumento}</title>
+        <style>${estilos}</style>
+    </head>
+    <body>
+        ${contenido}
+        <script>${scriptInline.replace(/<\//g, '<\\/')}</script>
+    </body>
+    </html>`;
+
+    const reporteBlob = new Blob([docHTML], { type: 'text/html' });
+    const reporteURL = URL.createObjectURL(reporteBlob);
+    const ventanaReporte = window.open(reporteURL, '_blank');
+
+    if (!ventanaReporte) {
+        URL.revokeObjectURL(reporteURL);
+        mostrarToast('❌ El navegador bloqueó la vista previa del reporte. Permite ventanas emergentes para continuar.', 'danger');
+        return;
+    }
+
+    setTimeout(() => {
+        URL.revokeObjectURL(reporteURL);
+    }, 60 * 1000);
+}
+
 async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
     const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
     const tasaCambio = parseFloat(document.getElementById('tasaCambio').value) || 0;
 
-    // Filtrar movimientos según categoría y/o rango de fechas
     let movimientosFiltrados = movimientos.filter(m => {
         let cumple = true;
 
@@ -1504,48 +3051,64 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
             <style>
                 body { 
                     font-family: 'Roboto', sans-serif; 
-                    padding: 2rem; 
+                    padding: 1.5rem; 
                     color: var(--text); 
-                    background: var(--bg); /* Usa el fondo de tu app */
-                    line-height: 1.6;
+                    background: white; /* Fondo blanco para impresión */
+                    line-height: 1.5;
+                    font-size: 10pt;
+                    margin: 0;
                 }
                 h1 { 
                     text-align: center; 
                     color: #0b57d0; 
-                    margin-bottom: 1rem; 
-                    font-size: 1.5rem;
+                    margin-bottom: 0.5rem; 
+                    font-size: 1.4rem;
+                    font-weight: 500;
+                    page-break-after: avoid;
+                }
+                .fecha-generacion {
+                    text-align: center;
+                    font-size: 0.85rem;
+                    color: var(--text-light);
+                    margin-bottom: 1.5rem;
+                    page-break-after: avoid;
                 }
                 h2 { 
-                    margin-top: 2rem; 
-                    margin-bottom: 1rem; 
+                    text-align: center; 
                     color: #0b57d0; 
+                    margin: 1.5rem 0 1rem 0; 
                     font-weight: 600;
+                    font-size: 1.1rem;
+                    page-break-after: avoid;
                 }
                 .resumen-bancos {
                     margin-bottom: 2rem;
+                    break-inside: avoid;
                 }
                 table { 
                     width: 100%; 
                     border-collapse: collapse; 
                     margin-bottom: 2rem;
-                    table-layout: fixed; /* ✅ Fija el ancho de las columnas */
-                    font-size: 0.9rem;
+                    table-layout: fixed;
+                    font-size: 9pt;
+                    break-inside: avoid;
                 }
                 th, td { 
-                    padding: 0.75rem; 
+                    padding: 0.6rem; 
                     border-bottom: 1px solid #ddd;
-                    word-break: break-all; /* ✅ Rompe palabras largas */
-                    white-space: normal; /* ✅ Permite saltos de línea */
-                    overflow-wrap: break-word; /* ✅ Evita desbordamientos */
+                    word-break: keep-all; /* ✅ ¡CLAVE! Evita romper palabras */
+                    white-space: nowrap; /* ✅ ¡CLAVE! Evita saltos de línea */
                     overflow: hidden; /* ✅ Oculta lo que se sale */
                     text-overflow: ellipsis; /* ✅ Añade "..." si se corta demasiado */
+                    break-inside: avoid;
                 }
                 th { 
                     background: #0b57d0; 
                     color: white; 
                     font-weight: 600;
                     text-align: center;
-                    padding: 0.75rem;
+                    font-size: 9pt;
+                    padding: 0.6rem;
                 }
                 tr:nth-child(even) { 
                     background-color: #f9f9f9; 
@@ -1555,10 +3118,12 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
                     width: 28%; /* Ancho fijo para el nombre del banco */
                     text-align: left; /* Alinear a la izquierda */
                     font-weight: 500;
-                    word-break: break-all;
-                    white-space: normal;
-                    overflow-wrap: break-word;
+                    word-break: keep-all;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                     max-width: 250px;
+                    font-family: 'Roboto', sans-serif;
                 }
                 th:nth-child(2),
                 td:nth-child(2),
@@ -1571,7 +3136,11 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
                     width: 18%; /* Ancho fijo para cada columna de monto */
                     text-align: right; /* Alinear a la derecha */
                     font-family: 'Space Mono', monospace; /* Fuente monoespaciada para números */
-                    letter-spacing: -0.2px;
+                    letter-spacing: -0.1px;
+                    word-break: keep-all;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 /* ✅ Asegurar que el último td (saldo final) no se vea más ancho */
                 td:last-child {
@@ -1580,29 +3149,47 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
                 }
                 .total { 
                     font-weight: bold; 
-                    font-size: 1.2rem; 
+                    font-size: 1rem; 
                     color: #0b57d0; 
                     text-align: right; 
                     margin-top: 1.5rem; 
                     padding-top: 1rem;
                     border-top: 2px solid #0b57d0;
+                    break-inside: avoid;
                 }
                 .equivalente { 
                     font-weight: bold; 
-                    font-size: 1.1rem; 
+                    font-size: 1rem; 
                     color: #0b57d0; 
                     text-align: right; 
                     margin-top: 0.5rem;
+                    break-inside: avoid;
                 }
                 @media print {
-                    body { padding: 0; }
-                    button { display: none; }
+                    body { padding: 0; margin: 0; }
+                    button, .btn, .side-tab { display: none !important; }
+                    * {
+                        box-shadow: none !important;
+                        text-shadow: none !important;
+                        background: white !important;
+                        color: black !important;
+                    }
+                    .resumen-bancos, table, th, td, tr, h1, h2, .total, .equivalente {
+                        break-inside: avoid !important;
+                        page-break-inside: avoid !important;
+                    }
                 }
             </style>
         </head>
         <body>
             <h1>${titulo}</h1>
-            <h2>Resumen por Banco</h2>
+            
+            <div class="fecha-generacion">
+                Generado el: ${new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} a las ${new Date().toLocaleTimeString('es-VE')}
+            </div>
+
+            <h2 style="text-align: center; margin-bottom: 1rem;">Resumen por Banco</h2>
+            
             <div class="resumen-bancos">
                 <table>
                     <thead>
@@ -1637,14 +3224,17 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
                     </tbody>
                 </table>
             </div>
+
             <!-- Disponibilidad Total -->
             <div class="total">
                 <strong>Disponibilidad Total (Suma de todos los bancos):</strong> Bs. ${formatNumberVE(disponibilidadTotal)}
             </div>
+
             <!-- Equivalente en Dólares -->
             <div class="equivalente">
-                <strong>Equivalente en USD (Tasa: 1 USD = ${tasaCambio.toLocaleString('es-VE')} Bs):</strong> $ ${equivalenteDolares.toFixed(2)}
+                <strong>Equivalente en USD (Tasa: 1 USD = ${tasaCambio.toLocaleString('es-VE')} Bs):</strong> $ ${formatNumberVE(equivalenteDolares)}
             </div>
+
             <script>
                 window.print();
             </script>
@@ -1658,9 +3248,7 @@ async function generarReporteBase(categoriaFiltrada, rangoFechas, titulo) {
     ventana.document.close();
 }
 
-// ------------------------------------------------------------------------------------------------------------------------------------
-//                                 Bloqueo de App (PIN Local)
-// ------------------------------------------------------------------------------------------------------------------------------------
+// ... (rest of the code remains the same)
 
 // Cargar configuración de bloqueo al iniciar
 async function cargarConfigBloqueo() {
@@ -1689,81 +3277,93 @@ function cerrarModalBloqueo() {
     localStorage.setItem('intentosFallidos', '0'); // ✅ REINICIAR CONTADOR
 }
 
-// Desbloquear la app con el PIN
+// ✅ Función para desbloquear la aplicación
 async function desbloquearApp() {
-    const pinIngresado = document.getElementById('pinInput').value.trim().toLowerCase();
+    const pinIngresado = document.getElementById('pinInput').value.trim();
     const pinGuardado = localStorage.getItem('bloqueoPIN');
     const aviso = document.getElementById('avisoPinOlvidado');
-
+  
     // ✅ Reiniciar contador si se ingresa algo válido
-    if (pinIngresado === 'reset' || (pinIngresado.length === 4 && pinIngresado === pinGuardado)) {
-        localStorage.setItem('intentosFallidos', '0'); // Reiniciar contador
-        aviso.style.display = 'none';
-    }
-
-    // ✅ MODO DE EMERGENCIA: Si se ingresa "reset", desactiva el bloqueo
-    if (pinIngresado === 'reset') {
-        if (confirm('⚠️ ¿Estás seguro de que quieres desactivar el bloqueo de la app? \n\nEsto eliminará tu PIN y permitirá el acceso sin restricciones. \n\nSolo haz esto si olvidaste tu PIN y no tienes otra copia de seguridad.')) {
-            localStorage.removeItem('bloqueoPIN');
-            localStorage.removeItem('bloqueoActivo');
-            localStorage.removeItem('bloqueoDesbloqueado');
-            alert('🔒 Bloqueo desactivado con éxito. Ahora puedes acceder sin PIN.');
-            cerrarModalBloqueo();
-        }
-        return;
-    }
-
-    // Validación normal de PIN
-    if (!pinIngresado || pinIngresado.length !== 4) {
-        alert('Ingresa un PIN de 4 dígitos o escribe "reset" para desactivar el bloqueo.');
-        return;
-    }
-
     if (pinIngresado === pinGuardado) {
-        localStorage.setItem('bloqueoDesbloqueado', 'true');
-        localStorage.setItem('intentosFallidos', '0'); // Reiniciar contador
-        aviso.style.display = 'none';
-        cerrarModalBloqueo();
-        const pestaña = localStorage.getItem('agendaPestañaActiva');
-        if (pestaña) mostrarSideTab(pestaña);
-    } else {
-        // Contar intentos fallidos
-        let intentos = parseInt(localStorage.getItem('intentosFallidos')) || 0;
-        intentos++;
-        localStorage.setItem('intentosFallidos', intentos.toString());
-
-        // Mostrar aviso después de 2 intentos fallidos
-        if (intentos >= 2) {
-            aviso.style.display = 'block';
-        }
-
-        alert('PIN incorrecto. Intenta de nuevo.\n\n¿Olvidaste tu PIN? Escribe "reset" para desactivar el bloqueo.');
-        document.getElementById('pinInput').value = '';
+      localStorage.setItem('intentosFallidos', '0'); // Reiniciar contador
+      aviso.style.display = 'none';
+      localStorage.setItem('bloqueoDesbloqueado', 'true');
+      cerrarModalBloqueo();
+      const pestaña = localStorage.getItem('agendaPestañaActiva');
+      if (pestaña) mostrarSideTab(pestaña);
+      mostrarToast('✅ Aplicación desbloqueada.', 'success');
+      return;
     }
-}
+  
+    // Contar intentos fallidos
+    let intentos = parseInt(localStorage.getItem('intentosFallidos')) || 0;
+    intentos++;
+    localStorage.setItem('intentosFallidos', intentos.toString());
+  
+    // Mostrar aviso después de 2 intentos fallidos
+    if (intentos >= 2) {
+      aviso.style.display = 'block';
+    }
+  
+    alert('PIN incorrecto. Intenta de nuevo.');
+  
+    // ✅ Mostrar opción de recuperación con preguntas de seguridad
+    if (intentos >= 3) {
+      if (confirm('¿Deseas recuperar el acceso mediante las preguntas de seguridad?')) {
+        mostrarAyudaPinOlvidado();
+      }
+    }
+  }
 
-// Guardar PIN
+// ✅ Función para guardar el PIN y las preguntas de seguridad
 async function guardarPIN() {
     const pin = document.getElementById('bloqueoPIN').value.trim();
     const pinConfirm = document.getElementById('bloqueoPINConfirmar').value.trim();
-
+    const pregunta1 = document.getElementById('preguntaSeguridad1').value;
+    const respuesta1 = document.getElementById('respuestaSeguridad1').value.trim();
+    const pregunta2 = document.getElementById('preguntaSeguridad2').value;
+    const respuesta2 = document.getElementById('respuestaSeguridad2').value.trim();
+  
     if (!pin || pin.length !== 4 || !pinConfirm || pinConfirm.length !== 4) {
-        alert('El PIN debe tener exactamente 4 dígitos.');
-        return;
+      alert('El PIN debe tener exactamente 4 dígitos.');
+      return;
     }
-
+  
     if (pin !== pinConfirm) {
-        alert('Los PINs no coinciden. Vuelve a intentarlo.');
-        document.getElementById('bloqueoPIN').value = '';
-        document.getElementById('bloqueoPINConfirmar').value = '';
-        return;
+      alert('Los PINs no coinciden. Vuelve a intentarlo.');
+      document.getElementById('bloqueoPIN').value = '';
+      document.getElementById('bloqueoPINConfirmar').value = '';
+      return;
     }
-
+  
+    if (!pregunta1 || !respuesta1 || !pregunta2 || !respuesta2) {
+      alert('Debes seleccionar y responder ambas preguntas de seguridad.');
+      return;
+    }
+  
+    // Validar que las preguntas sean diferentes
+    if (pregunta1 === pregunta2) {
+      alert('Las preguntas de seguridad deben ser diferentes.');
+      return;
+    }
+  
+    // Guardar el PIN y las preguntas de seguridad en localStorage
     localStorage.setItem('bloqueoPIN', pin);
-    alert('✅ PIN guardado con éxito.');
+    localStorage.setItem('preguntaSeguridad1', pregunta1);
+    localStorage.setItem('respuestaSeguridad1', respuesta1);
+    localStorage.setItem('preguntaSeguridad2', pregunta2);
+    localStorage.setItem('respuestaSeguridad2', respuesta2);
+  
+    alert('✅ PIN y preguntas de seguridad guardados con éxito.');
     document.getElementById('bloqueoPIN').value = '';
     document.getElementById('bloqueoPINConfirmar').value = '';
-}
+    document.getElementById('preguntaSeguridad1').value = '';
+    document.getElementById('respuestaSeguridad1').value = '';
+    document.getElementById('preguntaSeguridad2').value = '';
+    document.getElementById('respuestaSeguridad2').value = '';
+  
+    actualizarBotonBloqueo();
+  }
 
 // Eliminar PIN
 async function eliminarPIN() {
@@ -1773,6 +3373,68 @@ async function eliminarPIN() {
     document.getElementById('bloqueoPIN').value = '';
     document.getElementById('bloqueoPINConfirmar').value = '';
     alert('PIN eliminado.');
+
+    actualizarBotonBloqueo();
+}
+
+// ✅ Función para mostrar el formulario de recuperación con preguntas de seguridad
+function mostrarRecuperacionConPreguntas() {
+    const modal = document.getElementById('modalBloqueo');
+    if (!modal) {
+      console.error('❌ Modal de bloqueo no encontrado.');
+      return;
+    }
+  
+    const pregunta1 = localStorage.getItem('preguntaSeguridad1');
+    const pregunta2 = localStorage.getItem('preguntaSeguridad2');
+  
+    if (!pregunta1 || !pregunta2) {
+      alert('No se han configurado preguntas de seguridad.');
+      return;
+    }
+  
+    const html = `
+      <div style="background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem; width: 90%; max-width: 500px; text-align: center;">
+        <h2 style="color: var(--primary); margin-bottom: 1rem;">🔐 Recuperación de Acceso</h2>
+        <p style="color: var(--text-light); line-height: 1.6; margin-bottom: 1.5rem;">
+          Responde las siguientes preguntas de seguridad para recuperar el acceso.
+        </p>
+  
+        <div style="margin-bottom: 1rem;">
+          <p style="color: var(--text-light); margin: 0 0 0.5rem 0;"><strong>${pregunta1}</strong></p>
+          <input type="text" id="respuestaRecuperacion1" placeholder="Respuesta" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        </div>
+  
+        <div style="margin-bottom: 1rem;">
+          <p style="color: var(--text-light); margin: 0 0 0.5rem 0;"><strong>${pregunta2}</strong></p>
+          <input type="text" id="respuestaRecuperacion2" placeholder="Respuesta" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        </div>
+  
+       <button onclick="verificarRespuestasRecuperacion()" style="width: 100%; padding: 0.75rem; font-size: 1rem; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer;">✅ Verificar Respuestas</button>
+        <button onclick="cerrarModalBloqueo()" style="width: 100%; padding: 0.75rem; font-size: 1rem; background: var(--danger); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 1rem;">Cancelar</button>
+      </div>
+    `;
+  
+    modal.innerHTML = html;
+  }
+  
+// ✅ Función para verificar las respuestas de recuperación
+function verificarRespuestasRecuperacion() {
+    const respuesta1 = document.getElementById('respuestaRecuperacion1').value.trim().toLowerCase();
+    const respuesta2 = document.getElementById('respuestaRecuperacion2').value.trim().toLowerCase();
+    const respuestaGuardada1 = localStorage.getItem('respuestaSeguridad1').toLowerCase();
+    const respuestaGuardada2 = localStorage.getItem('respuestaSeguridad2').toLowerCase();
+  
+    if (respuesta1 === respuestaGuardada1 && respuesta2 === respuestaGuardada2) {
+      localStorage.setItem('bloqueoDesbloqueado', 'true');
+      localStorage.setItem('intentosFallidos', '0');
+      cerrarModalBloqueo();
+      const pestaña = localStorage.getItem('agendaPestañaActiva');
+      if (pestaña) mostrarSideTab(pestaña);
+      mostrarToast('✅ Acceso recuperado con éxito.', 'success');
+    } else {
+      alert('Respuestas incorrectas. Inténtalo de nuevo.');
+    }
 }
 
 // Controlar el checkbox de activación
@@ -2163,9 +3825,141 @@ Se actualizó${afectados !== 1 ? 'ron' : ''} ${afectados} movimiento${afectados 
 }
 
 // ✅ EXPORTAR BACKUP COMPLETO (todo el estado de la app)
+// ✅ EXPORTAR BACKUP COMPLETO (todo el estado de la app)
 async function exportarBackup() {
     try {
-        // Recopilar todos los datos
+        // Obtener el nombre personalizado del usuario
+        const nombrePersonalizado = document.getElementById('nombreBackup').value.trim();
+
+        // Si el usuario no ingresó un nombre, usar uno por defecto
+        const nombreBase = nombrePersonalizado || 'Backup_Sistema_Financiero';
+
+        // Generar nombre único con la fecha y hora
+        const fecha = new Date();
+        const nombreBackup = `${nombreBase}_${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}_${String(fecha.getHours()).padStart(2, '0')}${String(fecha.getMinutes()).padStart(2, '0')}.json`;
+
+        // Datos de IndexedDB
+        const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+        const categorias = await getAllEntries(STORES.CATEGORIAS);
+        const bancos = await getAllEntries(STORES.BANCOS);
+        const reglas = await getAllEntries(STORES.REGLAS);
+        const saldoInicial = await getAllEntries(STORES.SALDO_INICIAL);
+        const inversiones = await getAllEntries(STORES.INVERSIONES);
+        const empresas = await getAllEntries(STORES.EMPRESAS);
+        const proveedores = await getAllEntries(STORES.PROVEEDORES);
+        const inventario = await getAllEntries(STORES.INVENTARIO);
+        const notas = await getAllEntries(STORES.NOTAS);
+        const asistente = await getAllEntries(STORES.ASISTENTE);
+        const categoriasAsistente = await getAllEntries(STORES.CATEGORIAS_ASISTENTE);
+
+        let recordatorios = [];
+        if (typeof getAllRecordatorios === 'function') {
+            try {
+                recordatorios = await getAllRecordatorios();
+            } catch (error) {
+                console.warn('No se pudieron obtener los recordatorios para el backup:', error);
+            }
+        }
+
+        // Datos del localStorage
+        const localConfigKeys = {
+            metaPresupuesto: localStorage.getItem('metaPresupuesto'),
+            tasaCambio: localStorage.getItem('tasaCambio'),
+            bloqueoActivo: localStorage.getItem('bloqueoActivo'),
+            bloqueoPIN: localStorage.getItem('bloqueoPIN'),
+            bloqueoDesbloqueado: localStorage.getItem('bloqueoDesbloqueado'),
+            preguntaSeguridad1: localStorage.getItem('preguntaSeguridad1'),
+            preguntaSeguridad2: localStorage.getItem('preguntaSeguridad2'),
+            respuestaSeguridad1: localStorage.getItem('respuestaSeguridad1'),
+            respuestaSeguridad2: localStorage.getItem('respuestaSeguridad2'),
+            agendaTema: localStorage.getItem('agendaTema'),
+            agendaPestanaActiva: localStorage.getItem('agendaPestañaActiva'),
+            empresaActivaId: localStorage.getItem('empresaActivaId'),
+            empresaActivaNombre: localStorage.getItem('empresaActivaNombre'),
+            numeroModo: localStorage.getItem('numeroModo'),
+            sonidosActivados: localStorage.getItem('sonidosActivados'),
+            historialBCV: localStorage.getItem('historialBCV'),
+            dashboardWidgets: localStorage.getItem('dashboardWidgets'),
+            deudas: localStorage.getItem('deudas'),
+            metasAhorro: localStorage.getItem('metasAhorro'),
+            sonidoSeleccionado: localStorage.getItem('sonidoSeleccionado'),
+            sonidoPersonalizado: localStorage.getItem('sonidoPersonalizado'),
+            mostrarTodasCategorias: localStorage.getItem('mostrarTodasCategorias'),
+            intentosFallidos: localStorage.getItem('intentosFallidos')
+        };
+
+        // Construir objeto de respaldo completo
+        const backup = {
+            version: '2.0',
+            appVersion: APP_VERSION,
+            generadoEn: new Date().toISOString(),
+            descripcion: 'Respaldo total del Sistema Financiero',
+            datos: {
+                movimientos,
+                categorias,
+                bancos,
+                reglas,
+                saldoInicial,
+                inversiones,
+                empresas,
+                proveedores,
+                inventario,
+                notas,
+                asistente,
+                categoriasAsistente,
+                recordatorios
+            },
+            preferencias: localConfigKeys,
+            estadisticas: {
+                totalMovimientos: movimientos.length,
+                totalCategorias: categorias.length,
+                totalBancos: bancos.length,
+                totalReglas: reglas.length,
+                totalEmpresas: empresas.length,
+                totalProveedores: proveedores.length,
+                totalInventario: inventario.length,
+                totalNotas: notas.length,
+                totalRecordatorios: recordatorios.length,
+                totalInversiones: inversiones.length
+            }
+        };
+
+        // Convertir a JSON y descargar
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", nombreBackup);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+
+        mostrarToast(`✅ Backup exportado como "${nombreBackup}"`, 'success');
+
+    } catch (error) {
+        console.error("Error al exportar backup:", error);
+        mostrarToast('❌ Error al exportar el backup', 'danger');
+    }
+}
+
+// Alias semántico para el nuevo botón de exportación total
+async function exportarRespaldoTotal() {
+    await exportarBackup();
+}
+
+// ✅ Función auxiliar para guardar el backup localmente (con nombre personalizado)
+async function guardarBackupActual() {
+    try {
+        // Obtener el nombre personalizado del usuario
+        const nombrePersonalizado = document.getElementById('nombreBackup').value.trim();
+
+        // Si el usuario no ingresó un nombre, usar uno por defecto
+        const nombreBase = nombrePersonalizado || 'Backup_Sistema_Financiero';
+
+        // Generar nombre único con la fecha y hora
+        const fecha = new Date();
+        const nombreBackup = `${nombreBase}_${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}_${String(fecha.getHours()).padStart(2, '0')}${String(fecha.getMinutes()).padStart(2, '0')}.json`;
+
+        // Crear los datos del backup
         const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
         const categorias = await getAllEntries(STORES.CATEGORIAS);
         const bancos = await getAllEntries(STORES.BANCOS);
@@ -2193,110 +3987,54 @@ async function exportarBackup() {
             tema: tema
         };
 
-        // Convertir a JSON y descargar
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `SFP_Backup_${new Date().toISOString().split('T')[0]}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        // Guardar en localStorage con el nombre personalizado
+        localStorage.setItem(nombreBackup, JSON.stringify(backup));
 
-        alert("✅ Backup exportado con éxito. Archivo guardado como 'SFP_Backup_YYYY-MM-DD.json'");
+        // Mostrar notificación
+        alert(`✅ Backup guardado correctamente como "${nombreBackup.replace('backup_', '').replace('.json', '')}"`);
+        return true;
+
     } catch (error) {
-        console.error("Error al exportar backup:", error);
-        alert("❌ Error al exportar el backup. Revisa la consola.");
+        console.error('Error al guardar backup:', error);
+        alert('❌ Error al guardar el backup. Revisa la consola para más detalles.');
+        return false;
     }
 }
 
-// ✅ IMPORTAR BACKUP COMPLETO (restaura todo)
-async function importarBackup() {
+// ✅ IMPORTAR BACKUP DESDE DISCO (restaura todo)
+async function importarBackupDesdeDisco() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
     input.style.display = 'none';
     document.body.appendChild(input);
-
     input.onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-
+        if (!file) {
+            input.remove();
+            return;
+        }
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
                 const backup = JSON.parse(event.target.result);
+                const version = backup?.version?.toString();
 
-                // Validar versión
-                if (backup.version !== '1.0') {
+                if (version !== '1.0' && version !== '2.0') {
                     alert("⚠️ Este archivo de backup no es compatible con esta versión de la app.");
+                    input.remove();
                     return;
                 }
 
-                // Confirmar antes de sobrescribir
                 if (!confirm("⚠️ ¡ADVERTENCIA! Esto borrará todos tus datos actuales y los reemplazará con los del backup. ¿Continuar?")) {
+                    input.remove();
                     return;
                 }
 
-                // 1. Borrar todo lo existente
-                const transaction = db.transaction([STORES.MOVIMIENTOS, STORES.CATEGORIAS, STORES.BANCOS, STORES.REGLAS, STORES.SALDO_INICIAL], 'readwrite');
-                const movStore = transaction.objectStore(STORES.MOVIMIENTOS);
-                const catStore = transaction.objectStore(STORES.CATEGORIAS);
-                const banStore = transaction.objectStore(STORES.BANCOS);
-                const regStore = transaction.objectStore(STORES.REGLAS);
-                const salStore = transaction.objectStore(STORES.SALDO_INICIAL);
+                await restaurarBackupDesdeObjeto(backup);
 
-                // Limpiar almacenes
-                movStore.clear();
-                catStore.clear();
-                banStore.clear();
-                regStore.clear();
-                salStore.clear();
-
-                // 2. Restaurar categorías
-                if (backup.categorias && backup.categorias.length > 0) {
-                    for (const cat of backup.categorias) {
-                        await addEntry(STORES.CATEGORIAS, cat);
-                    }
-                }
-
-                // 3. Restaurar bancos
-                if (backup.bancos && backup.bancos.length > 0) {
-                    for (const ban of backup.bancos) {
-                        await addEntry(STORES.BANCOS, ban);
-                    }
-                }
-
-                // 4. Restaurar reglas
-                if (backup.reglas && backup.reglas.length > 0) {
-                    for (const reg of backup.reglas) {
-                        await addEntry(STORES.REGLAS, reg);
-                    }
-                }
-
-                // 5. Restaurar saldo inicial
-                if (backup.saldoInicial) {
-                    await addEntry(STORES.SALDO_INICIAL, backup.saldoInicial);
-                }
-
-                // 6. Restaurar movimientos
-                if (backup.movimientos && backup.movimientos.length > 0) {
-                    for (const mov of backup.movimientos) {
-                        await addEntry(STORES.MOVIMIENTOS, mov);
-                    }
-                }
-
-                // 7. Restaurar localStorage
-                localStorage.setItem('metaPresupuesto', backup.metaPresupuesto || '');
-                localStorage.setItem('tasaCambio', backup.tasaCambio || '');
-                localStorage.setItem('bloqueoActivo', backup.bloqueoActivo ? 'true' : 'false');
-                localStorage.setItem('bloqueoPIN', backup.bloqueoPIN || '');
-                localStorage.setItem('agendaTema', backup.tema || '');
-
-                // 8. Limpiar input y refrescar app
                 input.remove();
                 alert("✅ Backup importado con éxito. Recargando la app...");
-
-                // Recargar la app para reflejar cambios
                 location.reload();
 
             } catch (error) {
@@ -2307,8 +4045,188 @@ async function importarBackup() {
         };
         reader.readAsText(file);
     };
-
     input.click();
+}
+
+// ✅ Función para importar un backup local (desde localStorage)
+async function importarBackupLocal(nombreBackup) {
+    try {
+        const backup = JSON.parse(localStorage.getItem(nombreBackup));
+        const version = backup?.version?.toString();
+
+        if (version !== '1.0' && version !== '2.0') {
+            alert("⚠️ Este archivo de backup no es compatible con esta versión de la app.");
+            return;
+        }
+
+        if (!confirm("⚠️ ¡ADVERTENCIA! Esto borrará todos tus datos actuales y los reemplazará con los del backup. ¿Continuar?")) {
+            return;
+        }
+
+        await restaurarBackupDesdeObjeto(backup);
+
+        alert("✅ Backup importado con éxito. Recargando la app...");
+        location.reload();
+
+    } catch (error) {
+        console.error("Error al importar backup local:", error);
+        alert("❌ Error al importar el backup. El archivo puede estar corrupto o no compatible.");
+    }
+}
+
+function setLocalStorageValue(key, value) {
+    if (value === null || value === undefined) {
+        localStorage.removeItem(key);
+    } else {
+        localStorage.setItem(key, value);
+    }
+}
+
+async function restaurarColeccion(items, inserter) {
+    if (!Array.isArray(items) || items.length === 0 || typeof inserter !== 'function') {
+        return;
+    }
+
+    for (const item of items) {
+        if (item !== undefined && item !== null) {
+            await inserter(item);
+        }
+    }
+}
+
+async function restaurarDesdeBackupV1(backup) {
+    await restaurarColeccion(backup.categorias, (item) => addEntry(STORES.CATEGORIAS, item));
+    await restaurarColeccion(backup.bancos, (item) => addEntry(STORES.BANCOS, item));
+    await restaurarColeccion(backup.reglas, (item) => addEntry(STORES.REGLAS, item));
+    await restaurarColeccion(backup.movimientos, (item) => addEntry(STORES.MOVIMIENTOS, item));
+
+    if (backup.saldoInicial) {
+        await addEntry(STORES.SALDO_INICIAL, backup.saldoInicial);
+    }
+
+    setLocalStorageValue('metaPresupuesto', backup.metaPresupuesto ?? '');
+    setLocalStorageValue('tasaCambio', backup.tasaCambio ?? '');
+    setLocalStorageValue('bloqueoActivo', backup.bloqueoActivo ? 'true' : 'false');
+    setLocalStorageValue('bloqueoPIN', backup.bloqueoPIN ?? '');
+    setLocalStorageValue('agendaTema', backup.tema ?? '');
+}
+
+async function restaurarDesdeBackupV2(backup) {
+    const datos = backup.datos || {};
+    const preferencias = backup.preferencias || {};
+
+    await restaurarColeccion(datos.categorias, (item) => addEntry(STORES.CATEGORIAS, item));
+    await restaurarColeccion(datos.bancos, (item) => addEntry(STORES.BANCOS, item));
+    await restaurarColeccion(datos.reglas, (item) => addEntry(STORES.REGLAS, item));
+    await restaurarColeccion(datos.movimientos, (item) => addEntry(STORES.MOVIMIENTOS, item));
+    await restaurarColeccion(datos.saldoInicial, (item) => addEntry(STORES.SALDO_INICIAL, item));
+    await restaurarColeccion(datos.inversiones, (item) => addEntry(STORES.INVERSIONES, item));
+    await restaurarColeccion(datos.empresas, (item) => addEntry(STORES.EMPRESAS, item));
+    await restaurarColeccion(datos.proveedores, (item) => addEntry(STORES.PROVEEDORES, item));
+    await restaurarColeccion(datos.inventario, (item) => addEntry(STORES.INVENTARIO, item));
+    await restaurarColeccion(datos.notas, (item) => addEntry(STORES.NOTAS, item));
+    await restaurarColeccion(datos.asistente, (item) => addEntry(STORES.ASISTENTE, item));
+    await restaurarColeccion(datos.categoriasAsistente, (item) => addEntry(STORES.CATEGORIAS_ASISTENTE, item));
+
+    if (Array.isArray(datos.recordatorios) && datos.recordatorios.length > 0) {
+        if (typeof addRecordatorio === 'function') {
+            await restaurarColeccion(datos.recordatorios, (item) => addRecordatorio(item));
+        } else if (typeof STORES_RECORDATORIOS !== 'undefined' && STORES_RECORDATORIOS?.RECORDATORIOS) {
+            await restaurarColeccion(datos.recordatorios, (item) => addEntry(STORES_RECORDATORIOS.RECORDATORIOS, item));
+        }
+    }
+
+    const preferenceMap = {
+        metaPresupuesto: 'metaPresupuesto',
+        tasaCambio: 'tasaCambio',
+        bloqueoActivo: 'bloqueoActivo',
+        bloqueoPIN: 'bloqueoPIN',
+        bloqueoDesbloqueado: 'bloqueoDesbloqueado',
+        preguntaSeguridad1: 'preguntaSeguridad1',
+        preguntaSeguridad2: 'preguntaSeguridad2',
+        respuestaSeguridad1: 'respuestaSeguridad1',
+        respuestaSeguridad2: 'respuestaSeguridad2',
+        agendaTema: 'agendaTema',
+        agendaPestanaActiva: 'agendaPestañaActiva',
+        empresaActivaId: 'empresaActivaId',
+        empresaActivaNombre: 'empresaActivaNombre',
+        numeroModo: 'numeroModo',
+        sonidosActivados: 'sonidosActivados',
+        historialBCV: 'historialBCV',
+        dashboardWidgets: 'dashboardWidgets',
+        deudas: 'deudas',
+        metasAhorro: 'metasAhorro',
+        sonidoSeleccionado: 'sonidoSeleccionado',
+        sonidoPersonalizado: 'sonidoPersonalizado',
+        mostrarTodasCategorias: 'mostrarTodasCategorias',
+        intentosFallidos: 'intentosFallidos'
+    };
+
+    Object.entries(preferenceMap).forEach(([backupKey, storageKey]) => {
+        if (Object.prototype.hasOwnProperty.call(preferencias, backupKey)) {
+            setLocalStorageValue(storageKey, preferencias[backupKey]);
+        } else {
+            setLocalStorageValue(storageKey, null);
+        }
+    });
+
+    // Manejar posibles claves adicionales para compatibilidad futura
+    for (const [key, value] of Object.entries(preferencias)) {
+        if (!Object.prototype.hasOwnProperty.call(preferenceMap, key)) {
+            setLocalStorageValue(key, value);
+        }
+    }
+}
+
+async function restaurarBackupDesdeObjeto(backup) {
+    if (!backup || !backup.version) {
+        throw new Error('El archivo de backup no contiene una versión válida.');
+    }
+
+    const version = backup.version.toString();
+
+    if (version !== '1.0' && version !== '2.0') {
+        throw new Error(`Versión de backup no compatible: ${version}`);
+    }
+
+    await clearAllStores();
+
+    if (version === '1.0') {
+        await restaurarDesdeBackupV1(backup);
+    } else {
+        await restaurarDesdeBackupV2(backup);
+    }
+}
+
+// ✅ Función para cargar los backups guardados automáticamente
+async function cargarBackupsGuardados() {
+    const lista = document.getElementById('listaBackups');
+    if (!lista) return;
+
+    // Filtrar claves de localStorage que terminen en ".json"
+    const claves = Object.keys(localStorage).filter(key => key.endsWith('.json'));
+
+    if (claves.length === 0) {
+        lista.innerHTML = '<p style="text-align: center; color: var(--text-light);">No hay backups guardados.</p>';
+        return;
+    }
+
+    let html = '';
+    claves.forEach(clave => {
+        const backup = JSON.parse(localStorage.getItem(clave));
+        const fecha = new Date(backup.fecha).toLocaleString('es-VE');
+        html += `
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+        <span style="color: var(--text-light); font-size: 0.9rem;">${clave}</span>
+        <div style="display: flex; gap: 0.5rem;">
+            <button onclick="importarBackupLocal('${clave}')" style="background: var(--success); color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer;">📥 Importar</button>
+            <button onclick="eliminarBackup('${clave}')" style="background: var(--danger); color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer;">🗑️ Eliminar</button>
+        </div>
+    </div>
+`;
+    });
+
+    lista.innerHTML = html;
 }
 
 // Cargar configuración de bloqueo al inicio
@@ -2435,176 +4353,30 @@ function verRecibo(base64Data) {
     ventana.document.close();
 }
 
-// ✅ CALENDARIO VISUAL DE MOVIMIENTOS
-let fechaActual = new Date(); // Fecha inicial: hoy
-
-// Renderiza el calendario completo
-async function renderizarCalendario() {
-    const calendario = document.getElementById('calendario');
-    calendario.innerHTML = '';
-
-    // Establecer el mes y año actual
-    const mes = fechaActual.getMonth();
-    const anio = fechaActual.getFullYear();
-    const primerDia = new Date(anio, mes, 1);
-    const ultimoDia = new Date(anio, mes + 1, 0);
-    const diasDelMes = ultimoDia.getDate();
-    const diaSemanaInicio = primerDia.getDay(); // 0 = domingo, 6 = sábado
-
-    // Mostrar el mes y año en el título
-    const meses = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    document.getElementById('mesActual').textContent = `${meses[mes]} ${anio}`;
-
-    // Días del mes anterior (para llenar el inicio)
-    const diasMesAnterior = new Date(anio, mes, 0).getDate();
-    for (let i = 0; i < diaSemanaInicio; i++) {
-        const dia = diasMesAnterior - diaSemanaInicio + i + 1;
-        const div = document.createElement('div');
-        div.className = 'dia-otro';
-        div.textContent = dia;
-        calendario.appendChild(div);
-    }
-
-    // Días del mes actual
-    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
-    const movimientosPorDia = {};
-
-    // Agrupar movimientos por día (YYYY-MM-DD)
-    movimientos.forEach(m => {
-        const dia = new Date(m.fecha).toISOString().split('T')[0];
-        if (!movimientosPorDia[dia]) movimientosPorDia[dia] = [];
-        movimientosPorDia[dia].push(m);
-    });
-
-    // Generar celdas de cada día
-    for (let dia = 1; dia <= diasDelMes; dia++) {
-        const fechaDia = new Date(anio, mes, dia);
-        const fechaStr = fechaDia.toISOString().split('T')[0]; // "2025-04-15"
-        const div = document.createElement('div');
-        div.textContent = dia;
-
-        // Clase para día actual
-        const hoy = new Date().toISOString().split('T')[0];
-        if (fechaStr === hoy) {
-            div.classList.add('dia-hoy');
-        }
-
-        // Clase para días con movimientos
-        if (movimientosPorDia[fechaStr]) {
-            div.classList.add('dia-con-movimiento');
-            div.addEventListener('click', () => mostrarMovimientosDia(fechaStr));
-        } else {
-            div.addEventListener('click', () => {
-                document.getElementById('detallesDia').style.display = 'none';
-                document.getElementById('diaSeleccionado').textContent = `${dia} de ${meses[mes]} ${anio}`;
-            });
-        }
-
-        calendario.appendChild(div);
-    }
-
-    // Días del mes siguiente (para llenar el final)
-    const diasRestantes = 7 - (diaSemanaInicio + diasDelMes) % 7;
-    if (diasRestantes < 7) {
-        for (let i = 1; i <= diasRestantes; i++) {
-            const div = document.createElement('div');
-            div.className = 'dia-otro';
-            div.textContent = i;
-            calendario.appendChild(div);
-        }
-    }
-}
-
-// Mostrar movimientos de un día específico
-async function mostrarMovimientosDia(fechaStr) {
-    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
-    const movimientosDia = movimientos.filter(m => {
-        const mFecha = new Date(m.fecha).toISOString().split('T')[0];
-        return mFecha === fechaStr;
-    });
-    const lista = document.getElementById('listaMovimientosDia');
-    lista.innerHTML = '';
-    if (movimientosDia.length === 0) {
-        lista.innerHTML = '<li style="color:var(--text-light); padding:0.75rem;">No hay movimientos este día.</li>';
-    } else {
-        movimientosDia.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).forEach(m => {
-            const li = document.createElement('li');
-            const tipo = m.tipo === 'ingreso' ? '+' : '-';
-            const color = m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)';
-            li.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid #eee;">
-                    <div style="flex:1;">
-                        <strong>${m.concepto}</strong><br>
-                        <small style="color:var(--text-light);">${m.categoria || 'Sin categoría'} • ${m.banco || '(Sin banco)'}</small>
-                    </div>
-                    <div style="font-weight:600; color:${color};">
-                        ${tipo} Bs. ${formatNumberVE(m.cantidad)}
-                    </div>
-                </div>
-            `;
-            lista.appendChild(li);
-        });
-    }
-    // ✅ Eliminar el título de fecha completa
-    // document.getElementById('diaSeleccionado').textContent = `${diaNombre}, ${diaNumero} de ${mesNombre} ${anio}`;
-    // ✅ No mostramos el título de fecha, solo la lista
-    document.getElementById('detallesDia').style.display = 'block';
-}
-
-// Cambiar de mes
-function cambiarMes(diferencia) {
-    fechaActual.setMonth(fechaActual.getMonth() + diferencia);
-    renderizarCalendario();
-}
 
 // ✅ CALCULADORA DE AHORRO MENSUAL
-async function calcularAhorroMensual() {
-    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
-    
-    // Filtrar movimientos de los últimos 3 meses
-    const hoy = new Date();
-    const tresMesesAtras = new Date(hoy.getFullYear(), hoy.getMonth() - 3, 1);
-    
-    const movimientosFiltrados = movimientos.filter(m => {
-        const fechaMov = new Date(m.fecha);
-        return fechaMov >= tresMesesAtras && fechaMov <= hoy;
-    });
-    
-    if (movimientosFiltrados.length === 0) {
-        alert('No hay suficientes movimientos en los últimos 3 meses para calcular.');
-        return;
+function calcularAhorroMensual(meta) {
+    try {
+        // ✅ Verificar que los elementos existen antes de usarlos
+        const ahorroMensualElement = document.getElementById('ahorroMensualMeta');
+        const diasRestantesElement = document.getElementById('diasRestantesMeta');
+        
+        // Si los elementos no existen, salir silenciosamente
+        if (!ahorroMensualElement || !diasRestantesElement) {
+            return;
+        }
+        
+        const diasRestantes = Math.ceil((meta.fechaLimite - new Date()) / (1000 * 60 * 60 * 24));
+        const ahorroMensual = meta.montoObjetivo / Math.ceil((meta.fechaLimite - new Date()) / (1000 * 60 * 60 * 24 * 30));
+        
+        // ✅ Solo actualizar si los elementos existen
+        ahorroMensualElement.textContent = formatearNumero(ahorroMensual);
+        diasRestantesElement.textContent = diasRestantes;
+        
+    } catch (error) {
+        console.error('Error en calcularAhorroMensual:', error);
+        // No mostrar toast para evitar spam
     }
-    
-    // Agrupar por mes (YYYY-MM)
-    const porMes = {};
-    movimientosFiltrados.forEach(m => {
-        const mes = new Date(m.fecha).toISOString().slice(0, 7); // "2025-04"
-        if (!porMes[mes]) porMes[mes] = { ingresos: 0, gastos: 0 };
-        if (m.tipo === 'ingreso') porMes[mes].ingresos += m.cantidad;
-        else porMes[mes].gastos += m.cantidad;
-    });
-    
-    // Calcular promedios
-    const meses = Object.keys(porMes);
-    const totalIngresos = meses.reduce((sum, mes) => sum + porMes[mes].ingresos, 0);
-    const totalGastos = meses.reduce((sum, mes) => sum + porMes[mes].gastos, 0);
-    const promedioIngresos = totalIngresos / meses.length;
-    const promedioGastos = totalGastos / meses.length;
-    const promedioAhorro = promedioIngresos - promedioGastos;
-    
-    // Mostrar en UI
-    document.getElementById('ingresosPromedio').textContent = `Bs. ${formatNumberVE(promedioIngresos)}`;
-    document.getElementById('gastosPromedio').textContent = `Bs. ${formatNumberVE(promedioGastos)}`;
-    document.getElementById('ahorroPromedio').textContent = `Bs. ${formatNumberVE(promedioAhorro)}`;
-    
-    // Actualizar simulación
-    actualizarSimulacion(0); // Inicializar con 0%
-    
-    // Renderizar gráfico
-    renderizarGraficoAhorro(porMes);
 }
 
 // ✅ Actualizar simulación cuando cambie la reducción
@@ -2685,13 +4457,6 @@ function renderizarGraficoAhorro(porMes) {
         }
     });
 }
-
-// ✅ Escuchar cambios en el select de reducción
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('reduccionGastos').addEventListener('change', function() {
-        actualizarSimulacion(parseFloat(this.value));
-    });
-});
 
 // ✅ ELIMINAR TODOS LOS MOVIMIENTOS (con confirmación)
 async function eliminarTodosLosMovimientos() {
@@ -2891,7 +4656,6344 @@ async function renderizarComparacionBancos() {
             }
         }
     });
+
 }
+
+// ✅ MODULO: Modo de Entrada de Números (Automático o Literal)
+function cargarModoEntradaNumeros() {
+    const modoGuardado = localStorage.getItem('numeroModo') || 'automatico';
+    document.getElementById('modoAutomatico').checked = modoGuardado === 'automatico';
+    document.getElementById('modoLiteral').checked = modoGuardado === 'literal';
+}
+
+function guardarModoEntradaNumeros() {
+    const modo = document.querySelector('input[name="numeroModo"]:checked').value;
+    localStorage.setItem('numeroModo', modo);
+}
+
+// Escuchar cambios en los radios
+document.addEventListener('DOMContentLoaded', function() {
+    cargarModoEntradaNumeros();
+    const radios = document.querySelectorAll('input[name="numeroModo"]');
+    radios.forEach(radio => {
+        radio.addEventListener('change', guardarModoEntradaNumeros);
+    });
+});
+
+// ✅ Actualizar aviso de modo en los campos
+function actualizarAvisoModo() {
+    const modo = localStorage.getItem('numeroModo') || 'automatico';
+    const texto = modo === 'literal' ? 'Literal' : 'Automático';
+    document.getElementById('modoActualCantidad').textContent = texto;
+    document.getElementById('modoActualSaldo').textContent = texto;
+    document.getElementById('avisoModoCantidad').style.display = 'block';
+    document.getElementById('avisoModoSaldo').style.display = 'block';
+}
+
+// Llamarlo al cargar la app y cuando cambie el modo
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarAvisoModo();
+    // También actualizar cuando cambie el modo en Configuración
+    const radios = document.querySelectorAll('input[name="numeroModo"]');
+    radios.forEach(radio => {
+        radio.addEventListener('change', actualizarAvisoModo);
+    });
+});
+
+//ACTUALIZAR EL DASHBOARD DINÁMICAMENTE:
+// ✅ ACTUALIZAR TODO EL DASHBOARD EN TIEMPO REAL
+async function actualizarDashboard() {
+
+    // ✅ MOSTRAR VERSIÓN EN EL DASHBOARD
+    const versionElement = document.getElementById('versionDashboard');
+    if (versionElement) {
+        versionElement.textContent = APP_VERSION;
+    }
+
+    // 1. Actualizar saldo
+    await actualizarSaldo();
+
+    // 2. Actualizar resumen por banco (tabla completa)
+    await actualizarResumenBancosCompleto();
+
+    // 3. Actualizar disponibilidad total (en la sección "Disponibilidad total")
+    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+    const saldoTotal = movimientos.reduce((sum, m) => {
+        if (m.tipo === 'gasto') return sum - m.cantidad;
+        return sum + m.cantidad;
+    }, 0);
+    document.getElementById('totalGeneral').textContent = formatNumberVE(saldoTotal);
+
+    // 4. Actualizar gráficos de gastos y resumen mensual
+    await actualizarGrafico();
+    await actualizarBarChart();
+
+    // 5. Actualizar alerta de saldo bajo
+    const saldoBs = parseFloat(document.getElementById('saldo').textContent.replace('Bs. ', '').replace(/\./g, '').replace(',', '.'));
+    const umbral = 500;
+    const alerta = document.getElementById('alertaSaldo');
+    if (saldoBs < umbral) {
+        alerta.style.display = 'block';
+    } else {
+        alerta.style.display = 'none';
+    }
+
+    // 6. Actualizar equivalente en otra moneda (si hay tasa)
+    actualizarEquivalente();
+
+    // 7. Actualizar aviso de comisión
+    const avisoComision = document.getElementById('saldoAviso');
+    if (avisoComision) {
+        avisoComision.style.display = saldoTotal > 0 ? 'block' : 'none';
+    }
+}
+
+// ✅ Event listener para los radio buttons del modo de entrada de números
+document.addEventListener('DOMContentLoaded', function() {
+    // Event listener para los radio buttons del modo de entrada
+    const radioButtons = document.querySelectorAll('input[name="numeroModo"]');
+    radioButtons.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                localStorage.setItem('numeroModo', this.value);
+                console.log('Modo de entrada cambiado a:', this.value);
+                
+                // Mostrar confirmación al usuario
+                const modoTexto = this.value === 'automatico' ? 'Automático' : 'Literal';
+                alert(`✅ Modo de entrada cambiado a: ${modoTexto}`);
+            }
+        });
+    });
+    
+    // Cargar el modo guardado al iniciar
+    const modoGuardado = localStorage.getItem('numeroModo') || 'automatico';
+    const radioGuardado = document.getElementById(modoGuardado === 'automatico' ? 'modoAutomatico' : 'modoLiteral');
+    if (radioGuardado) {
+        radioGuardado.checked = true;
+    }
+});
+
+/* ----------  RENDERIZAR PRESUPUESTO CON TARJETAS  ---------- */
+const TARJETAS_POR_PAGINA = 6;
+let paginaActualPres = 1;
+
+async function renderizarPresupuestoTarjetas() {
+  const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+  const fechaHoy = new Date();
+  const fechaHace30Dias = new Date(fechaHoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const gastos = movimientos.filter(m =>
+    m.tipo === 'gasto' &&
+    new Date(m.fecha) >= fechaHace30Dias &&
+    new Date(m.fecha) <= fechaHoy
+  );
+
+  // Agrupar por categoría
+  const resumen = {};
+  gastos.forEach(m => {
+    const cat = m.categoria || 'Sin categoría';
+    resumen[cat] = (resumen[cat] || 0) + m.cantidad;
+  });
+
+  const categorias = Object.entries(resumen).sort((a, b) => b[1] - a[1]);
+  const totalPaginas = Math.ceil(categorias.length / TARJETAS_POR_PAGINA);
+  paginaActualPres = Math.min(paginaActualPres, totalPaginas || 1);
+
+  const inicio = (paginaActualPres - 1) * TARJETAS_POR_PAGINA;
+  const fin = inicio + TARJETAS_POR_PAGINA;
+  const pagina = categorias.slice(inicio, fin);
+
+  // Renderizar tarjetas
+  const container = document.getElementById('listaPresupuestoDetalles');
+  container.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'presupuesto-grid';
+
+  pagina.forEach(([cat, monto]) => {
+    const tarjeta = document.createElement('div');
+    tarjeta.className = 'tarjeta-gasto';
+    tarjeta.innerHTML = `
+      <div class="tarjeta-emoji">${emojiCategoria(cat)}</div>
+      <div class="tarjeta-categoria">${cat}</div>
+      <div class="tarjeta-monto">Bs. ${formatNumberVE(monto)}</div>
+    `;
+    grid.appendChild(tarjeta);
+  });
+
+  container.appendChild(grid);
+
+  // Paginación
+  renderizarPaginacionPresupuesto(totalPaginas);
+}
+
+/* ----------  EMOJI POR CATEGORÍA (opcional)  ---------- */
+function emojiCategoria(cat) {
+  const map = {
+    'Honorarios': '💰',
+    'Laboratorios': '🧪',
+    'Material': '🩺',
+    'Servicios': '🔌',
+    'Oficina': '🖥️',
+    'Transporte': '🚗',
+    'Comida': '🍔',
+    'Otros': '📦'
+  };
+  return map[cat] || '📊';
+}
+
+/* ----------  RENDERIZAR PAGINACIÓN  ---------- */
+function renderizarPaginacionPresupuesto(total) {
+  const container = document.getElementById('paginacionPresupuesto') || document.createElement('div');
+  container.id = 'paginacionPresupuesto';
+  container.className = 'paginacion-presupuesto';
+
+  if (total <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <button onclick="cambiarPaginaPresupuesto(-1)" ${paginaActualPres === 1 ? 'disabled' : ''}>←</button>
+    <span class="paginacion-info">Página ${paginaActualPres} de ${total}</span>
+    <button onclick="cambiarPaginaPresupuesto(1)" ${paginaActualPres === total ? 'disabled' : ''}>→</button>
+  `;
+
+  const detalles = document.getElementById('listaPresupuestoDetalles');
+  detalles.parentNode.insertBefore(container, detalles.nextSibling);
+}
+
+/* ----------  CAMBIAR PÁGINA  ---------- */
+function cambiarPaginaPresupuesto(direccion) {
+  paginaActualPres += direccion;
+  renderizarPresupuestoTarjetas();
+}
+
+// ================== BUSCADOR EN VIVO DEL DASHBOARD ==================
+function filtrarDashboard() {
+    const needle = document.getElementById('txtBuscar').value.trim().toLowerCase();
+    if (!needle) {                       // sin texto → mostrar todo
+      actualizarDashboard();             // recarga original
+      return;
+    }
+  
+    // 1️⃣ FILTRAR TABLA DE BANCOS
+    const filas = document.querySelectorAll('#tablaBancos tbody tr');
+    filas.forEach(tr => {
+      const texto = tr.textContent.toLowerCase();
+      tr.style.display = texto.includes(needle) ? '' : 'none';
+    });
+  
+    // 2️⃣ FILTRAR LISTA RESUMEN POR BANCO
+    const items = document.querySelectorAll('#listaBancos li');
+    items.forEach(li => {
+      const texto = li.textContent.toLowerCase();
+      li.style.display = texto.includes(needle) ? '' : 'none';
+    });
+  
+    // 3️⃣ (Opcional) Si en futuro pintas movimientos en dashboard, los filtras aquí
+  }
+  
+  // Escuchar cada tecla
+  document.getElementById('txtBuscar').addEventListener('input', filtrarDashboard);
+
+// ------------------------------------------------------------------------------------------------------------------------------------
+//                                 Funciones de ayuda modal para Presupuesto
+// ------------------------------------------------------------------------------------------------------------------------------------
+
+//FUNCIÓN PARA MOSTRAR AYUDA EN PRESUPUESTO
+function mostrarAyudaPresupuesto() {
+    document.getElementById('modalAyudaPresupuesto').style.display = 'flex';
+}
+
+function cerrarAyudaPresupuesto() {
+    document.getElementById('modalAyudaPresupuesto').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera de él
+document.addEventListener('DOMContentLoaded', function() {
+    const modalPresupuesto = document.getElementById('modalAyudaPresupuesto');
+    if (modalPresupuesto) {
+        modalPresupuesto.addEventListener('click', function(e) {
+            if (e.target === modalPresupuesto) {
+                cerrarAyudaPresupuesto();
+            }
+        });
+    }
+    
+    // Cerrar modal con tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modalPresupuesto && modalPresupuesto.style.display === 'flex') {
+            cerrarAyudaPresupuesto();
+        }
+    });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------------------
+//                                 Funciones de ayuda modal para otras pestañas
+// ------------------------------------------------------------------------------------------------------------------------------------
+
+function mostrarAyudaDashboard() {
+    // Crear modal similar al de presupuesto pero para Dashboard
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📊 ¿Qué es el Dashboard?</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">🔍 Secciones principales:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Saldo actual:</strong> Tu balance financiero total incluyendo comisiones</li>
+                <li><strong>Disponibilidad total:</strong> Suma de todos tus saldos en diferentes bancos</li>
+                <li><strong>Conversor de moneda:</strong> Convierte tu saldo a otras monedas</li>
+                <li><strong>Resumen por banco:</strong> Detalle de ingresos, gastos y saldos por entidad</li>
+            </ul>
+        </div>
+        <div style="background:var(--primary-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--primary); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--primary-text); font-size:0.875rem;">
+                <strong>💡 Consejo:</strong> Usa el conversor de moneda para saber cuánto equivale tu saldo en dólares o euros.
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaDashboard');
+}
+
+function mostrarAyudaMovimientos() {
+    // Crear modal para Movimientos
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📝 Gestión de Movimientos</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Agregar movimientos:</strong> Ingresos, gastos y saldos iniciales</li>
+                <li><strong>Clasificación automática:</strong> Por categorías y bancos</li>
+                <li><strong>Gestión avanzada:</strong> Editar, eliminar y buscar movimientos</li>
+                <li><strong>Exportación:</strong> Genera reportes Excel de tu actividad</li>
+            </ul>
+        </div>
+        <div style="background:var(--success-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--success); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--success-text); font-size:0.875rem;">
+                <strong>🎯 Tip:</strong> Usa reglas de automatización para clasificar automáticamente tus movimientos frecuentes.
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaMovimientos');
+}
+
+function mostrarAyudaAnalisis() {
+    // Crear modal para Análisis
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📈 Análisis Financiero</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">📊 Gráficos disponibles:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Gráfico circular:</strong> Distribución de gastos por categoría</li>
+                <li><strong>Gráfico de barras:</strong> Evolución mensual de ingresos vs gastos</li>
+                <li><strong>Resumen por banco:</strong> Análisis detallado por entidad financiera</li>
+                <li><strong>Filtros avanzados:</strong> Visualiza datos específicos</li>
+            </ul>
+        </div>
+        <div style="background:var(--warning-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--warning); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--warning-text); font-size:0.875rem;">
+                <strong>📊 Interpretación:</strong> Usa estos gráficos para identificar patrones de gasto y tomar decisiones financieras informadas.
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaAnalisis');
+}
+
+function mostrarAyudaHerramientas() {
+    // Crear modal para Herramientas
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">🛠️ Herramientas Útiles</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">🔧 Funciones disponibles:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Formateador de números:</strong> Convierte números a formato venezolano</li>
+                <li><strong>Calculadora de equivalente:</strong> Convierte tu saldo a otras monedas</li>
+                <li><strong>Modo de entrada:</strong> Elige cómo ingresar cantidades (automático o literal)</li>
+                <li><strong>Copia de seguridad:</strong> Exporta e importa tus datos</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;">
+                <strong>⚡ Productividad:</strong> Estas herramientas agilizan la entrada de datos y facilitan conversiones monetarias.
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaHerramientas');
+}
+
+function mostrarAyudaConfiguracion() {
+    // Crear modal para Configuración
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">⚙️ Configuración Avanzada</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">🛠️ Opciones disponibles:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Reglas de automatización:</strong> Crea reglas para clasificar movimientos automáticamente</li>
+                <li><strong>Gestión de categorías:</strong> Crear, editar y eliminar categorías</li>
+                <li><strong>Gestión de bancos:</strong> Administrar entidades financieras</li>
+                <li><strong>Bloqueo de seguridad:</strong> Protege tu app con PIN</li>
+                <li><strong>Modo de entrada:</strong> Configura cómo ingresar números</li>
+            </ul>
+        </div>
+        <div style="background:var(--danger-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--danger); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--danger-text); font-size:0.875rem;">
+                <strong>⚠️ Importante:</strong> Las reglas de automatización te ahorran tiempo al clasificar movimientos frecuentes automáticamente.
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaConfiguracion');
+}
+
+// Función genérica para mostrar modales de ayuda
+function mostrarModalAyuda(contenido, modalId) {
+    // Crear modal dinámico si no existe
+    let modal = document.getElementById(modalId);
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = modalId;
+        modal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1002; justify-content:center; align-items:center;';
+        
+        modal.innerHTML = `
+            <div style="background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:2rem; width:90%; max-width:500px; max-height:80vh; overflow-y:auto; position:relative;">
+                <button onclick="document.getElementById('${modalId}').style.display='none';" 
+        style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; color:var(--text-light); cursor:pointer; padding:0.5rem; border-radius:50%; transition:background 0.2s;"
+        title="Cerrar">✕</button>
+                ${contenido}
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function mostrarAyudaInversiones() {
+    // Crear modal para Inversiones
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📈 ¿Cómo funciona el Simulador de Inversiones?</h2>
+
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">🎯 ¿Qué es esto?</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">
+                <strong>¡Es un simulador educativo!</strong> No inviertes dinero real, solo simulas inversiones para aprender y experimentar con diferentes estrategias.
+            </p>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Precios simulados:</strong> Los precios cambian automáticamente cada vez que actualizas</li>
+                <li><strong>Sin riesgo:</strong> Puedes experimentar con diferentes activos sin perder dinero</li>
+                <li><strong>Educativo:</strong> Perfecto para aprender conceptos de inversión</li>
+                <li><strong>Gráficos reales:</strong> Visualiza el rendimiento con gráficos profesionales</li>
+            </ul>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">📊 ¿Qué puedes hacer aquí?</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Agregar inversiones:</strong> Simula compra de acciones, cripto o fondos</li>
+                <li><strong>Seguimiento automático:</strong> Los precios se actualizan periódicamente</li>
+                <li><strong>Análisis visual:</strong> Ve gráficos de rendimiento y ganancias/pérdidas</li>
+                <li><strong>Portafolio simulado:</strong> Gestiona múltiples inversiones como en la vida real</li>
+            </ul>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">💡 Consejos para usar el simulador</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li>Empieza con cantidades pequeñas para experimentar</li>
+                <li>Prueba diferentes tipos de activos (acciones, cripto, fondos)</li>
+                <li>Observa cómo cambian los precios y afecta tu portafolio</li>
+                <li>Usa fechas diferentes para simular inversiones a largo plazo</li>
+            </ul>
+        </div>
+
+        <div style="background:var(--warning-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--warning); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--warning-text); font-size:0.875rem;">
+                <strong>⚠️ Recordatorio:</strong> Esto es solo un simulador educativo. No refleja inversiones reales ni precios de mercado actuales. ¡Es perfecto para aprender sin riesgos!
+            </p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaInversiones');
+}
+
+function cerrarAyudaInversiones() {
+    document.getElementById('modalAyudaInversiones').style.display = 'none';
+}
+
+//PESTAÑA INVERSIONES SIMULADAS:
+// Función para agregar una inversión
+async function agregarInversion() {
+    const activo = document.getElementById('activoInversion').value.trim();
+    const cantidadInvertida = parseNumberVE(document.getElementById('cantidadInvertida').value);
+    const fecha = new Date(document.getElementById('fechaInversion').value + 'T12:00:00');
+    const tipoActivo = document.getElementById('tipoActivo').value;
+
+    if (!activo || isNaN(cantidadInvertida) || !fecha) {
+        mostrarToast('Por favor, completa todos los campos.', 'danger');
+        return;
+    }
+
+    // Obtener el precio actual del activo
+    let precioActual = 0;
+    try {
+        precioActual = await obtenerPrecioActivo(activo, tipoActivo);
+    } catch (error) {
+        console.error('Error al obtener precio:', error);
+        mostrarToast('No se pudo obtener el precio del activo. Inténtalo de nuevo.', 'danger');
+        return;
+    }
+
+    // Calcular la cantidad de activos comprados (por ejemplo, si invertiste 1000 Bs y el precio es 10 Bs por unidad, tienes 100 unidades)
+    const cantidadUnidades = cantidadInvertida / precioActual;
+
+    const inversion = {
+        activo,
+        cantidadInvertida,
+        fecha: fecha.toISOString(),
+        tipoActivo,
+        precioCompra: precioActual,
+        cantidadUnidades,
+        precioActual: precioActual // Se actualizará periódicamente
+    };
+
+    try {
+        await addEntry(STORES.INVERSIONES, inversion);
+        mostrarToast('Inversión agregada con éxito.', 'success');
+        limpiarFormularioInversion();
+        renderizarInversiones();
+    } catch (error) {
+        console.error('Error al agregar inversión:', error);
+        mostrarToast('Error al agregar la inversión.', 'danger');
+    }
+}
+
+// Función para limpiar el formulario de inversión
+function limpiarFormularioInversion() {
+    document.getElementById('activoInversion').value = '';
+    document.getElementById('cantidadInvertida').value = '';
+    document.getElementById('fechaInversion').value = '';
+    document.getElementById('tipoActivo').value = 'accion';
+}
+
+// Función para renderizar la lista de inversiones y el gráfico
+async function renderizarInversiones() {
+    try {
+        const inversiones = await getAllEntries(STORES.INVERSIONES);
+        const ul = document.getElementById('listaInversiones');
+        ul.innerHTML = '';
+
+        if (inversiones.length === 0) {
+            ul.innerHTML = '<li style="text-align: center; color: var(--text-light);">No tienes inversiones simuladas.</li>';
+            // Crear gráfico vacío
+            actualizarGraficoInversiones([]);
+            return;
+        }
+
+        // Actualizar los precios actuales de cada inversión
+        for (const inversion of inversiones) {
+            try {
+                inversion.precioActual = await obtenerPrecioActivo(inversion.activo, inversion.tipoActivo);
+                // Actualizar en la base de datos
+                await updateEntry(STORES.INVERSIONES, inversion);
+            } catch (error) {
+                console.error(`Error al actualizar precio de ${inversion.activo}:`, error);
+            }
+        }
+
+        // Renderizar cada inversión
+        inversiones.forEach(inversion => {
+            const valorActual = inversion.cantidadUnidades * inversion.precioActual;
+            const gananciaPerdida = valorActual - inversion.cantidadInvertida;
+            const porcentajeCambio = (gananciaPerdida / inversion.cantidadInvertida) * 100;
+
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div style="flex: 1;">
+                    <strong>${inversion.activo}</strong> (${inversion.tipoActivo})
+                    <div style="font-size: 0.8rem; color: var(--text-light);">
+                        Invertido: ${formatNumberVE(inversion.cantidadInvertida)} Bs
+                        <br>Fecha: ${new Date(inversion.fecha).toLocaleDateString()}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div>Valor actual: <strong>${formatNumberVE(valorActual)} Bs</strong></div>
+                    <div style="color: ${gananciaPerdida >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${gananciaPerdida >= 0 ? '+' : ''}${formatNumberVE(gananciaPerdida)} Bs (${porcentajeCambio.toFixed(2)}%)
+                    </div>
+                    <button onclick="eliminarInversion(${inversion.id})" style="background: var(--danger); color: white; border: none; border-radius: 4px; padding: 0.25rem 0.5rem; margin-top: 0.5rem;">Eliminar</button>
+                </div>
+            `;
+            ul.appendChild(li);
+        });
+
+        // Actualizar gráfico
+        actualizarGraficoInversiones(inversiones);
+    } catch (error) {
+        console.error('Error al renderizar inversiones:', error);
+        mostrarToast('Error al cargar las inversiones. Inténtalo de nuevo.', 'danger');
+
+        // Mostrar mensaje de error en la interfaz
+        const ul = document.getElementById('listaInversiones');
+        if (ul) {
+            ul.innerHTML = '<li style="text-align: center; color: var(--danger);">Error al cargar inversiones. Verifica la consola para más detalles.</li>';
+        }
+    }
+}
+
+// ✅ NUEVA Y MEJORADA FUNCIÓN: RENDERIZAR CALENDARIO VISUAL INTERACTIVO (SOLO MES ACTUAL)
+async function renderizarCalendario() {
+    const container = document.getElementById('calendarContainer');
+    const monthYearEl = document.getElementById('calendarMonthYear');
+    const monthYearNavEl = document.getElementById('calendarMonthYearNav');
+    const movimientosDiaContainer = document.getElementById('movimientosDiaContainer');
+    const tarjetasContainer = document.getElementById('tarjetasMovimientos');
+    const infoPaginacion = document.getElementById('infoPaginacion');
+    const btnAnterior = document.getElementById('btnAnteriorTarjetas');
+    const btnSiguiente = document.getElementById('btnSiguienteTarjetas');
+    const fechaSeleccionadaEl = document.getElementById('fechaSeleccionada');
+    if (!container || !monthYearEl || !monthYearNavEl || !movimientosDiaContainer || !tarjetasContainer) return;
+
+    // Variable global para almacenar el estado actual del calendario
+    let currentMonth = new Date().getMonth(); // 0-11
+    let currentYear = new Date().getFullYear();
+
+    // Función auxiliar para renderizar el calendario
+    async function renderizarMes(month, year) {
+        // Limpiar contenedores
+        container.innerHTML = '';
+        tarjetasContainer.innerHTML = '';
+        movimientosDiaContainer.style.display = 'none';
+        btnAnterior.disabled = true;
+        btnSiguiente.disabled = true;
+        infoPaginacion.textContent = 'Página 1 de 1';
+
+        // Obtener todos los movimientos
+        // ✅ NUEVO (rápido):
+// Cargar movimientos UNA sola vez y reutilizar
+if (!window.movimientosCache) {
+    window.movimientosCache = await getAllEntries(STORES.MOVIMIENTOS);
+}
+const movimientos = window.movimientosCache;
+        // Crear mapa de días con movimientos: { 'YYYY-MM-DD': [movimientos] }
+        const diasConMovimientos = {};
+        movimientos.forEach(m => {
+            const fechaMov = new Date(m.fecha);
+            const key = `${fechaMov.getFullYear()}-${String(fechaMov.getMonth() + 1).padStart(2, '0')}-${String(fechaMov.getDate()).padStart(2, '0')}`;
+            if (!diasConMovimientos[key]) diasConMovimientos[key] = [];
+            diasConMovimientos[key].push(m);
+        });
+
+        // Días de la semana (domingo a sábado)
+        const diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sab'];
+        // ✅ NUEVO (reutilizar elementos):
+// Crear días de semana SOLO una vez
+if (!container.querySelector('.weekday')) {
+    diasSemana.forEach(dia => {
+        const dayEl = document.createElement('div');
+        dayEl.className = 'weekday';
+        dayEl.textContent = dia;
+        container.appendChild(dayEl);
+    });
+}
+
+        // Obtener primer día del mes y último día
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDayOfWeek = firstDay.getDay(); // 0 (domingo) a 6 (sábado)
+
+        // Días vacíos al inicio (solo si el mes no empieza en domingo)
+        for (let i = 0; i < startingDayOfWeek; i++) {
+            const emptyEl = document.createElement('div');
+            emptyEl.className = 'empty';
+            container.appendChild(emptyEl);
+        }
+
+        // Días del mes actual
+        for (let dia = 1; dia <= daysInMonth; dia++) {
+            const dayEl = document.createElement('div');
+            const fechaStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+            const hoy = new Date();
+            if (dia === hoy.getDate() && month === hoy.getMonth() && year === hoy.getFullYear()) {
+                dayEl.className = 'today';
+            } else if (diasConMovimientos[fechaStr]) {
+                dayEl.className = 'day-with-movements';
+            } else {
+                dayEl.className = '';
+            }
+            dayEl.textContent = dia;
+
+            // ✅ EVENTO CLICK: Mostrar movimientos de ese día
+            dayEl.addEventListener('click', () => {
+                // Mostrar contenedor de tarjetas
+                movimientosDiaContainer.style.display = 'block';
+                fechaSeleccionadaEl.textContent = `${dia} de ${meses[month]} ${year}`;
+                // Obtener movimientos de ese día
+                const movimientosDelDia = diasConMovimientos[fechaStr] || [];
+                // Renderizar tarjetas
+                renderizarTarjetasMovimientos(movimientosDelDia, 1);
+                // Actualizar paginación
+                actualizarPaginacionTarjetas(movimientosDelDia.length);
+            });
+            container.appendChild(dayEl);
+        }
+
+        // Actualizar título del mes
+        const meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        monthYearEl.textContent = `${meses[month]} ${year}`;
+        monthYearNavEl.textContent = `${meses[month]} ${year}`;
+    }
+
+    // Función auxiliar: CAMBIAR MES
+    // ✅ NUEVO (actualizar solo lo necesario):
+window.cambiarMes = function(direccion) {
+    currentMonth += direccion;
+    if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+    } else if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+    }
+    renderizarMes(currentMonth, currentYear); // ← ¡Solo actualiza números!
+};
+
+    // Función auxiliar: RENDERIZAR TARJETAS DE MOVIMIENTOS POR DÍA
+    function renderizarTarjetasMovimientos(movimientos, pagina) {
+        const tarjetasContainer = document.getElementById('tarjetasMovimientos');
+        const TARJETAS_POR_PAGINA = 6;
+        const inicio = (pagina - 1) * TARJETAS_POR_PAGINA;
+        const fin = inicio + TARJETAS_POR_PAGINA;
+        const paginaActual = movimientos.slice(inicio, fin);
+        // Limpiar
+        tarjetasContainer.innerHTML = '';
+        if (paginaActual.length === 0) {
+            tarjetasContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: var(--text-light); font-style: italic;">
+                    No hay movimientos registrados para este día.
+                </div>
+            `;
+            return;
+        }
+        // Renderizar cada tarjeta
+        paginaActual.forEach(m => {
+            const tarjeta = document.createElement('div');
+            tarjeta.className = 'tarjeta-movimiento';
+            // Emoji por categoría (mismo sistema que Presupuesto)
+            const emoji = emojiCategoria(m.categoria || 'Sin categoría');
+            // ✅ NUEVO (moderno y atractivo):
+const montoColor = m.tipo === 'ingreso' ? 'var(--success)' : 'var(--danger)';
+const montoSigno = m.tipo === 'ingreso' ? '+' : '-';
+
+tarjeta.innerHTML = `
+    <div class="movement-list-item">
+        
+        <div class="list-item-left">
+            <div class="list-item-icon">${emoji}</div>
+            <div class="list-item-info">
+                <div class="list-item-concept">${m.concepto}</div>
+                <div class="list-item-category">${m.categoria || 'Sin categoría'}</div>
+            </div>
+        </div>
+        
+        <div class="list-item-right">
+            
+            <div class="list-item-amount-group">
+                <div class="list-item-amount-value" style="color: ${montoColor};">
+                    ${montoSigno} Bs. ${formatNumberVE(m.cantidad)}
+                </div>
+                ${m.banco ? `<div class="list-item-bank">${m.banco}</div>` : ''}
+            </div>
+            
+            <div class="list-item-datetime">
+                <span>${new Date(m.fecha).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })}</span>
+                <span>${new Date(m.fecha).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            
+        </div>
+        
+    </div>
+`;
+            tarjetasContainer.appendChild(tarjeta);
+        });
+    }
+
+    // Función auxiliar: ACTUALIZAR PAGINACIÓN DE TARJETAS
+    function actualizarPaginacionTarjetas(totalMovimientos) {
+        const TARJETAS_POR_PAGINA = 6;
+        const totalPaginas = Math.ceil(totalMovimientos / TARJETAS_POR_PAGINA);
+        const paginaActual = 1;
+        const infoPaginacion = document.getElementById('infoPaginacion');
+        const btnAnterior = document.getElementById('btnAnteriorTarjetas');
+        const btnSiguiente = document.getElementById('btnSiguienteTarjetas');
+        infoPaginacion.textContent = `Página ${paginaActual} de ${totalPaginas}`;
+        btnAnterior.disabled = true;
+        btnSiguiente.disabled = totalPaginas <= 1;
+        document.getElementById('paginacionTarjetas').style.display = totalPaginas > 1 ? 'flex' : 'none';
+    }
+
+    // Función auxiliar: CAMBIAR PÁGINA DE TARJETAS
+    // Función auxiliar: CAMBIAR PÁGINA DE TARJETAS
+window.cambiarPaginaTarjetas = function(direccion) {
+    const tarjetasContainer = document.getElementById('tarjetasMovimientos');
+    const infoPaginacion = document.getElementById('infoPaginacion');
+    const btnAnterior = document.getElementById('btnAnteriorTarjetas');
+    const btnSiguiente = document.getElementById('btnSiguienteTarjetas');
+    
+    // Recuperar la fecha seleccionada para obtener los movimientos
+    const fechaTexto = document.getElementById('fechaSeleccionada').textContent;
+    const partes = fechaTexto.split(' ');
+    const dia = partes[0];
+    const mesNombre = partes[2];
+    const anio = partes[3];
+    
+    const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const mesIndex = meses.indexOf(mesNombre);
+    
+    // Obtener movimientos (usar cache si existe)
+    const movimientos = window.movimientosCache || [];
+    
+    // Filtrar movimientos del día y mes seleccionado
+    const movimientosDelDia = movimientos.filter(m => {
+        const fechaMov = new Date(m.fecha);
+        return fechaMov.getDate() == dia &&
+               fechaMov.getMonth() == mesIndex &&
+               fechaMov.getFullYear() == anio;
+    });
+    
+    // Calcular nueva página
+    const TARJETAS_POR_PAGINA = 6;
+    const totalPaginas = Math.ceil(movimientosDelDia.length / TARJETAS_POR_PAGINA);
+    let nuevaPagina = parseInt(infoPaginacion.textContent.split(' ')[1]) + direccion;
+    
+    if (nuevaPagina < 1) nuevaPagina = 1;
+    if (nuevaPagina > totalPaginas) nuevaPagina = totalPaginas;
+    
+    // Renderizar
+    renderizarTarjetasMovimientos(movimientosDelDia, nuevaPagina);
+    
+    // Actualizar paginación
+    infoPaginacion.textContent = `Página ${nuevaPagina} de ${totalPaginas}`;
+    btnAnterior.disabled = nuevaPagina <= 1;
+    btnSiguiente.disabled = nuevaPagina >= totalPaginas;
+};
+
+    // Función auxiliar: EMOJI POR CATEGORÍA (igual que en Presupuesto)
+    function emojiCategoria(cat) {
+        const map = {
+            'Honorarios': '💰',
+            'Laboratorios': '🧪',
+            'Material': '🩺',
+            'Servicios': '🔌',
+            'Oficina': '🖥️',
+            'Transporte': '🚗',
+            'Comida': '🍔',
+            'Otros': '📦',
+            'Sin categoría': '📊',
+            'Ingreso': '📈',
+            'Gasto': '📉',
+            'Saldo inicial': '🏦'
+        };
+        return map[cat] || '📊';
+    }
+
+    // Renderizar el mes actual al cargar
+    renderizarMes(currentMonth, currentYear);
+}
+
+// Función para actualizar el gráfico de inversiones
+function actualizarGraficoInversiones(inversiones) {
+    const canvas = document.getElementById('graficoInversiones');
+    if (!canvas) {
+        console.warn('Canvas de gráfico de inversiones no encontrado');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Si ya hay un gráfico válido, destruirlo
+    if (window.graficoInversiones && typeof window.graficoInversiones.destroy === 'function') {
+        window.graficoInversiones.destroy();
+    }
+
+    // Si no hay inversiones, no crear gráfico
+    if (!inversiones || inversiones.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '16px Arial';
+        ctx.fillStyle = 'var(--text-light)';
+        ctx.textAlign = 'center';
+        ctx.fillText('No hay inversiones para mostrar', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const labels = inversiones.map(inv => inv.activo);
+    const dataInvertido = inversiones.map(inv => inv.cantidadInvertida);
+    const dataActual = inversiones.map(inv => inv.cantidadUnidades * inv.precioActual);
+
+    try {
+        window.graficoInversiones = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Invertido',
+                        data: dataInvertido,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                    },
+                    {
+                        label: 'Valor actual',
+                        data: dataActual,
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Comparación: Invertido vs Valor Actual'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Cantidad (Bs)'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error al crear gráfico de inversiones:', error);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = '14px Arial';
+        ctx.fillStyle = 'var(--danger)';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error al cargar el gráfico', canvas.width / 2, canvas.height / 2);
+    }
+}
+
+// ======================================================================================
+// ✅ SISTEMA DE WIDGETS PERSONALIZABLES
+// ======================================================================================
+
+// Widget types disponibles
+const TIPOS_WIDGET = {
+    RESUMEN_FINANCIERO: 'resumen_financiero',
+    GRAFICO_GASTOS: 'grafico_gastos',
+    ALERTA_SALDO: 'alerta_saldo',
+    CONVERSOR_MONEDA: 'conversor_moneda',
+    PROGRESO_PRESUPUESTO: 'progreso_presupuesto',
+    ULTIMOS_MOVIMIENTOS: 'ultimos_movimientos'
+};
+
+// Función para obtener configuración de widgets del localStorage
+function obtenerConfiguracionWidgets() {
+    const config = localStorage.getItem('dashboardWidgets');
+    return config ? JSON.parse(config) : [];
+}
+
+// Función para guardar configuración de widgets
+function guardarConfiguracionWidgets(config) {
+    localStorage.setItem('dashboardWidgets', JSON.stringify(config));
+}
+
+// Función para crear un widget básico
+function crearWidget(id, tipo, titulo, configuracion = {}) {
+    const widget = {
+        id,
+        tipo,
+        titulo,
+        configuracion,
+        posicion: Date.now(), // Para ordenamiento
+        activo: true
+    };
+    return widget;
+}
+
+// Función para agregar un nuevo widget
+function agregarWidget() {
+    const tipos = Object.values(TIPOS_WIDGET);
+    const tipoSeleccionado = tipos[Math.floor(Math.random() * tipos.length)]; // Para demo
+    
+    const widget = crearWidget(
+        'widget_' + Date.now(),
+        tipoSeleccionado,
+        obtenerTituloWidget(tipoSeleccionado)
+    );
+    
+    const config = obtenerConfiguracionWidgets();
+    config.push(widget);
+    guardarConfiguracionWidgets(config);
+    
+    cargarWidgets();
+    mostrarToast('✅ Widget agregado exitosamente', 'success');
+}
+
+// Función para obtener título según el tipo de widget
+function obtenerTituloWidget(tipo) {
+    const titulos = {
+        [TIPOS_WIDGET.RESUMEN_FINANCIERO]: '📊 Resumen Financiero',
+        [TIPOS_WIDGET.GRAFICO_GASTOS]: '📈 Gastos por Categoría',
+        [TIPOS_WIDGET.ALERTA_SALDO]: '⚠️ Alerta de Saldo',
+        [TIPOS_WIDGET.CONVERSOR_MONEDA]: '💱 Conversor de Moneda',
+        [TIPOS_WIDGET.PROGRESO_PRESUPUESTO]: '🎯 Progreso del Presupuesto',
+        [TIPOS_WIDGET.ULTIMOS_MOVIMIENTOS]: '📝 Últimos Movimientos'
+    };
+    return titulos[tipo] || 'Widget Personalizado';
+}
+
+// Función para renderizar un widget específico
+function renderizarWidget(widget) {
+    const contenedor = document.getElementById('contenedorWidgets');
+    if (!contenedor) return;
+
+    const widgetElement = document.createElement('div');
+    widgetElement.className = 'widget-card';
+    widgetElement.id = `widget-${widget.id}`;
+    widgetElement.draggable = true;
+    
+    // Agregar estilos básicos para el widget
+    widgetElement.style.cssText = `
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 1rem;
+        box-shadow: var(--shadow-sm);
+        transition: all var(--transition);
+        cursor: move;
+        border: 1px solid var(--text-light);
+    `;
+    
+    // Header del widget
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;';
+    
+    const titulo = document.createElement('h3');
+    titulo.textContent = widget.titulo;
+    titulo.style.cssText = 'font-size: 1rem; margin: 0; color: var(--text);';
+    
+    const controles = document.createElement('div');
+    controles.style.cssText = 'display: flex; gap: 0.25rem;';
+    
+    // Botón configurar
+    const btnConfig = document.createElement('button');
+    btnConfig.innerHTML = '⚙️';
+    btnConfig.style.cssText = 'background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.25rem; border-radius: 4px; font-size: 0.8rem;';
+    btnConfig.title = 'Configurar widget';
+    btnConfig.onclick = () => configurarWidget(widget.id);
+    
+    // Botón eliminar
+    const btnEliminar = document.createElement('button');
+    btnEliminar.innerHTML = '🗑️';
+    btnEliminar.style.cssText = 'background: none; border: none; color: var(--danger); cursor: pointer; padding: 0.25rem; border-radius: 4px; font-size: 0.8rem;';
+    btnEliminar.title = 'Eliminar widget';
+    btnEliminar.onclick = () => eliminarWidget(widget.id);
+    
+    controles.appendChild(btnConfig);
+    controles.appendChild(btnEliminar);
+    
+    header.appendChild(titulo);
+    header.appendChild(controles);
+    
+    // Contenido del widget según su tipo
+    const contenido = document.createElement('div');
+    contenido.className = 'widget-content';
+    contenido.style.cssText = 'color: var(--text-light);';
+    
+    // Renderizar contenido según el tipo de widget
+    switch (widget.tipo) {
+        case TIPOS_WIDGET.RESUMEN_FINANCIERO:
+            contenido.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <p style="font-size: 0.8rem; margin: 0 0 0.25rem 0;">Saldo Actual</p>
+                        <p style="font-size: 1.2rem; font-weight: 600; color: var(--success); margin: 0;">Bs. ${formatNumberVE(0)}</p>
+                    </div>
+                    <div>
+                        <p style="font-size: 0.8rem; margin: 0 0 0.25rem 0;">Este Mes</p>
+                        <p style="font-size: 1.2rem; font-weight: 600; color: var(--primary); margin: 0;">Bs. ${formatNumberVE(0)}</p>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case TIPOS_WIDGET.ALERTA_SALDO:
+            contenido.innerHTML = `
+                <div style="text-align: center; padding: 1rem;">
+                    <p style="margin: 0 0 0.5rem 0;">💰 Estado del Saldo</p>
+                    <p style="font-size: 1.1rem; font-weight: 600; color: var(--success); margin: 0;">✓ Saldo Saludable</p>
+                </div>
+            `;
+            break;
+            
+        case TIPOS_WIDGET.CONVERSOR_MONEDA:
+            contenido.innerHTML = `
+                <div style="text-align: center;">
+                    <p style="margin: 0 0 0.5rem 0;">💱 Equivalente en USD</p>
+                    <p style="font-size: 1.3rem; font-weight: 600; color: var(--primary); margin: 0;">$0.00</p>
+                    <p style="font-size: 0.8rem; color: var(--text-light); margin: 0.25rem 0 0 0;">Tasa: 1 USD = Bs. 0,00</p>
+                </div>
+            `;
+            break;
+            
+        default:
+            contenido.innerHTML = `
+                <div style="text-align: center; padding: 1rem;">
+                    <p style="margin: 0;">📊 Widget ${widget.tipo}</p>
+                    <p style="font-size: 0.8rem; color: var(--text-light); margin: 0.5rem 0 0 0;">Contenido personalizado</p>
+                </div>
+            `;
+    }
+    
+    widgetElement.appendChild(header);
+    widgetElement.appendChild(contenido);
+    
+    // Eventos de drag & drop
+    widgetElement.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', widget.id);
+        widgetElement.style.opacity = '0.5';
+    });
+    
+    widgetElement.addEventListener('dragend', () => {
+        widgetElement.style.opacity = '1';
+        guardarOrdenWidgets();
+    });
+    
+    widgetElement.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+    
+    widgetElement.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData('text/plain');
+        const dropTarget = widgetElement;
+        
+        if (draggedId !== dropTarget.id.replace('widget-', '')) {
+            reordenarWidgets(draggedId, dropTarget.id.replace('widget-', ''));
+        }
+    });
+    
+    return widgetElement;
+}
+
+// Función para cargar todos los widgets
+function cargarWidgets() {
+    const contenedor = document.getElementById('contenedorWidgets');
+    const mensajeSinWidgets = document.getElementById('mensajeSinWidgets');
+    
+    if (!contenedor) return;
+    
+    // Limpiar contenedor
+    contenedor.innerHTML = '';
+    
+    const config = obtenerConfiguracionWidgets();
+    
+    if (config.length === 0) {
+        mensajeSinWidgets.style.display = 'block';
+        return;
+    }
+    
+    mensajeSinWidgets.style.display = 'none';
+    
+    // Ordenar widgets por posición
+    config.sort((a, b) => a.posicion - b.posicion);
+    
+    // Renderizar cada widget
+    config.forEach(widget => {
+        if (widget.activo) {
+            const widgetElement = renderizarWidget(widget);
+            contenedor.appendChild(widgetElement);
+        }
+    });
+}
+
+// Función para eliminar un widget
+function eliminarWidget(widgetId) {
+    mostrarConfirmacion('¿Estás seguro de que quieres eliminar este widget?').then(confirmado => {
+        if (confirmado) {
+            const config = obtenerConfiguracionWidgets();
+            const nuevosWidgets = config.filter(w => w.id !== widgetId);
+            guardarConfiguracionWidgets(nuevosWidgets);
+            
+            cargarWidgets();
+            mostrarToast('✅ Widget eliminado', 'success');
+        }
+    });
+}
+
+// Función para configurar un widget
+function configurarWidget(widgetId) {
+    mostrarToast('🔧 Configuración de widgets próximamente', 'info');
+    // Aquí iría la lógica para configurar opciones específicas del widget
+}
+
+// Función para mostrar configuración general de widgets
+function mostrarConfiguracionWidgets() {
+    mostrarToast('⚙️ Configuración general próximamente', 'info');
+    // Aquí iría un modal con opciones generales de widgets
+}
+
+// Función para guardar el orden de los widgets
+function guardarOrdenWidgets() {
+    const contenedor = document.getElementById('contenedorWidgets');
+    if (!contenedor) return;
+    
+    const widgets = Array.from(contenedor.children);
+    const config = obtenerConfiguracionWidgets();
+    
+    widgets.forEach((widget, index) => {
+        const widgetId = widget.id.replace('widget-', '');
+        const widgetConfig = config.find(w => w.id === widgetId);
+        if (widgetConfig) {
+            widgetConfig.posicion = index;
+        }
+    });
+    
+    guardarConfiguracionWidgets(config);
+}
+
+// Función para reordenar widgets mediante drag & drop
+function reordenarWidgets(draggedId, targetId) {
+    const config = obtenerConfiguracionWidgets();
+    const draggedIndex = config.findIndex(w => w.id === draggedId);
+    const targetIndex = config.findIndex(w => w.id === targetId);
+    
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+        // Intercambiar posiciones
+        [config[draggedIndex], config[targetIndex]] = [config[targetIndex], config[draggedIndex]];
+        
+        // Actualizar posiciones
+        config.forEach((widget, index) => {
+            widget.posicion = index;
+        });
+        
+        guardarConfiguracionWidgets(config);
+        cargarWidgets();
+    }
+}
+
+// Función para mostrar ayuda sobre widgets
+function mostrarAyudaWidgets() {
+    mostrarToast('❓ Los widgets son componentes personalizables que puedes agregar, eliminar y reorganizar en tu dashboard', 'info');
+}
+
+// Función para editar deuda (funcionalidad básica)
+function editarDeuda(deudaId) {
+    mostrarToast('✏️ Edición de deudas próximamente', 'info');
+    // Aquí iría la lógica para editar una deuda existente
+}
+
+// Inicializar widgets cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar widgets cuando se muestra el dashboard
+    const dashboardTab = document.querySelector('[onclick="mostrarSideTab(\'dashboard\')"]');
+    if (dashboardTab) {
+        dashboardTab.addEventListener('click', cargarWidgets);
+    }
+    
+    // También cargar si ya estamos en el dashboard
+    if (document.getElementById('side-dashboard').classList.contains('active')) {
+        cargarWidgets();
+    }
+});
+
+// ======================================================================================
+// ✅ SISTEMA DE GESTIÓN DE DEUDAS Y PRÉSTAMOS
+// ======================================================================================
+
+// Constantes para tipos de deuda
+const TIPOS_DEUDA = {
+    DEBO: 'debo',
+    ME_DEBEN: 'me_deben'
+};
+
+const ESTADOS_DEUDA = {
+    PENDIENTE: 'pendiente',
+    PAGADA: 'pagada',
+    VENCIDA: 'vencida'
+};
+
+// Función para obtener configuración de deudas del localStorage
+function obtenerDeudas() {
+    const deudas = localStorage.getItem('deudas');
+    return deudas ? JSON.parse(deudas) : [];
+}
+
+// Función para guardar deudas en localStorage
+function guardarDeudas(deudas) {
+    localStorage.setItem('deudas', JSON.stringify(deudas));
+}
+
+// Función para limpiar el formulario de deuda
+function limpiarFormularioDeuda() {
+    document.getElementById('nombreDeudor').value = '';
+    document.getElementById('montoDeuda').value = '';
+    document.getElementById('fechaDeuda').value = '';
+    document.getElementById('descripcionDeuda').value = '';
+    document.getElementById('tieneInteres').checked = false;
+    document.getElementById('tasaInteres').value = '';
+    document.getElementById('tieneFechaVencimiento').checked = false;
+    document.getElementById('fechaVencimiento').value = '';
+    document.getElementById('camposInteres').style.display = 'none';
+    document.getElementById('camposVencimiento').style.display = 'none';
+    document.querySelector('input[name="tipoDeuda"][value="debo"]').checked = true;
+}
+
+// Función para guardar una nueva deuda
+function guardarDeuda() {
+    const nombre = document.getElementById('nombreDeudor').value.trim();
+    const monto = document.getElementById('montoDeuda').value.trim();
+    const moneda = document.getElementById('monedaDeuda').value;
+    const fecha = document.getElementById('fechaDeuda').value;
+    const descripcion = document.getElementById('descripcionDeuda').value.trim();
+    const tipo = document.querySelector('input[name="tipoDeuda"]:checked').value;
+    const tieneInteres = document.getElementById('tieneInteres').checked;
+    const tasaInteres = tieneInteres ? parseFloat(document.getElementById('tasaInteres').value) : 0;
+    const tieneVencimiento = document.getElementById('tieneFechaVencimiento').checked;
+    const fechaVencimiento = tieneVencimiento ? document.getElementById('fechaVencimiento').value : null;
+
+    // Validaciones
+    if (!nombre || !monto || !fecha) {
+        mostrarToast('❌ Por favor completa todos los campos obligatorios', 'danger');
+        return;
+    }
+
+    if (tieneInteres && (isNaN(tasaInteres) || tasaInteres < 0)) {
+        mostrarToast('❌ Ingresa una tasa de interés válida', 'danger');
+        return;
+    }
+
+    // Crear objeto deuda
+    const deuda = {
+        id: 'deuda_' + Date.now(),
+        nombre,
+        monto: parseFloat(monto),
+        moneda,
+        fecha,
+        descripcion,
+        tipo,
+        estado: ESTADOS_DEUDA.PENDIENTE,
+        tieneInteres,
+        tasaInteres,
+        tieneVencimiento,
+        fechaVencimiento,
+        fechaCreacion: new Date().toISOString(),
+        pagos: []
+    };
+
+    // Agregar deuda a la lista
+    const deudas = obtenerDeudas();
+    deudas.push(deuda);
+    guardarDeudas(deudas);
+
+    // Limpiar formulario y actualizar vista
+    limpiarFormularioDeuda();
+    cargarDeudas();
+    mostrarToast('✅ Deuda registrada exitosamente', 'success');
+}
+
+// Función para cargar y mostrar todas las deudas
+function cargarDeudas() {
+    const contenedor = document.getElementById('contenedorDeudas');
+    const filtroEstado = document.getElementById('filtroEstadoDeuda').value;
+    const filtroTipo = document.getElementById('filtroTipoDeuda').value;
+    
+    if (!contenedor) return;
+
+    const deudas = obtenerDeudas();
+    
+    // Aplicar filtros
+    let deudasFiltradas = deudas;
+    if (filtroEstado) {
+        deudasFiltradas = deudasFiltradas.filter(d => d.estado === filtroEstado);
+    }
+    if (filtroTipo) {
+        deudasFiltradas = deudasFiltradas.filter(d => d.tipo === filtroTipo);
+    }
+
+    // Limpiar contenedor
+    contenedor.innerHTML = '';
+
+    if (deudasFiltradas.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: var(--text-light); font-style: italic;">No hay deudas que coincidan con los filtros</p>';
+        actualizarResumenDeudas(deudas);
+        return;
+    }
+
+    // Crear tarjetas para cada deuda
+    deudasFiltradas.forEach(deuda => {
+        const tarjetaDeuda = crearTarjetaDeuda(deuda);
+        contenedor.appendChild(tarjetaDeuda);
+    });
+
+    actualizarResumenDeudas(deudas);
+    actualizarAlertasVencimiento(deudas);
+    actualizarSelectorDeudas();
+}
+
+// Función para crear tarjeta de deuda
+function crearTarjetaDeuda(deuda) {
+    const tarjeta = document.createElement('div');
+    tarjeta.className = 'tarjeta-deuda';
+    tarjeta.style.cssText = `
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid ${deuda.tipo === TIPOS_DEUDA.DEBO ? 'var(--danger)' : 'var(--success)'};
+        box-shadow: var(--shadow-sm);
+    `;
+
+    const esVencida = deuda.tieneVencimiento && new Date(deuda.fechaVencimiento) < new Date() && deuda.estado === ESTADOS_DEUDA.PENDIENTE;
+    if (esVencida) {
+        tarjeta.style.borderLeftColor = 'var(--danger)';
+    }
+
+    const montoFormateado = formatNumberVE(deuda.monto);
+    const simboloMoneda = deuda.moneda === 'USD' ? '$' : deuda.moneda === 'EUR' ? '€' : 'Bs.';
+
+    tarjeta.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+            <div>
+                <h3 style="margin: 0 0 0.25rem 0; color: var(--text);">${deuda.nombre}</h3>
+                <p style="margin: 0; color: var(--text-light); font-size: 0.875rem;">
+                    ${deuda.tipo === TIPOS_DEUDA.DEBO ? 'Debo' : 'Me deben'} ${simboloMoneda} ${montoFormateado}
+                    ${deuda.tieneFechaVencimiento ? `• Vence: ${new Date(deuda.fechaVencimiento).toLocaleDateString()}` : ''}
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.25rem;">
+                <button onclick="editarDeuda('${deuda.id}')" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0.25rem;" title="Editar">
+                    ✏️
+                </button>
+                <button onclick="marcarComoPagada('${deuda.id}')" style="background: none; border: none; color: var(--success); cursor: pointer; padding: 0.25rem;" title="Marcar como pagada">
+                    ✅
+                </button>
+                <button onclick="eliminarDeuda('${deuda.id}')" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 0.25rem;" title="Eliminar">
+                    🗑️
+                </button>
+            </div>
+        </div>
+        
+        ${deuda.tieneInteres ? `<p style="margin: 0 0 0.5rem 0; font-size: 0.875rem; color: var(--text-light);">💰 Interés: ${deuda.tasaInteres}% anual</p>` : ''}
+        
+        ${deuda.descripcion ? `<p style="margin: 0 0 0.5rem 0; font-size: 0.875rem; color: var(--text-light);">📝 ${deuda.descripcion}</p>` : ''}
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-light);">
+            <span>Creada: ${new Date(deuda.fechaCreacion).toLocaleDateString()}</span>
+            <span class="${esVencida ? 'vencida' : deuda.estado}">Estado: ${esVencida ? 'VENCIDA' : deuda.estado.toUpperCase()}</span>
+        </div>
+    `;
+
+    return tarjeta;
+}
+
+// Función para actualizar resumen de deudas
+function actualizarResumenDeudas(deudas) {
+    const totalDebo = deudas
+        .filter(d => d.tipo === TIPOS_DEUDA.DEBO && d.estado === ESTADOS_DEUDA.PENDIENTE)
+        .reduce((sum, d) => sum + d.monto, 0);
+
+    const totalMeDeben = deudas
+        .filter(d => d.tipo === TIPOS_DEUDA.ME_DEBEN && d.estado === ESTADOS_DEUDA.PENDIENTE)
+        .reduce((sum, d) => sum + d.monto, 0);
+
+    document.getElementById('totalDebo').textContent = formatNumberVE(totalDebo);
+    document.getElementById('totalMeDeben').textContent = formatNumberVE(totalMeDeben);
+}
+
+// Función para actualizar alertas de vencimiento
+function actualizarAlertasVencimiento(deudas) {
+    const alertasContenedor = document.getElementById('contenedorAlertas');
+    const hoy = new Date();
+    const proximosDias = 7; // Alertar si vence en los próximos 7 días
+
+    const alertas = deudas.filter(d => {
+        if (d.estado !== ESTADOS_DEUDA.PENDIENTE || !d.tieneVencimiento) return false;
+        
+        const fechaVencimiento = new Date(d.fechaVencimiento);
+        const diferenciaDias = Math.ceil((fechaVencimiento - hoy) / (1000 * 60 * 60 * 24));
+        
+        return diferenciaDias <= proximosDias && diferenciaDias >= 0;
+    });
+
+    if (alertas.length === 0) {
+        alertasContenedor.innerHTML = '<p style="text-align: center; color: var(--text-light); font-style: italic;">No hay alertas pendientes</p>';
+        return;
+    }
+
+    alertasContenedor.innerHTML = '';
+    alertas.forEach(alerta => {
+        const fechaVencimiento = new Date(alerta.fechaVencimiento);
+        const diferenciaDias = Math.ceil((fechaVencimiento - hoy) / (1000 * 60 * 60 * 24));
+        
+        const alertaDiv = document.createElement('div');
+        alertaDiv.style.cssText = `
+            background: ${diferenciaDias === 0 ? 'var(--danger)' : 'var(--warning)'};
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        `;
+        
+        alertaDiv.innerHTML = `
+            <strong>🚨 ${alerta.nombre}</strong><br>
+            Vence ${diferenciaDias === 0 ? 'HOY' : `en ${diferenciaDias} día${diferenciaDias !== 1 ? 's' : ''}`}
+            ${alerta.tipo === TIPOS_DEUDA.DEBO ? `• Debo Bs. ${formatNumberVE(alerta.monto)}` : `• Me deben Bs. ${formatNumberVE(alerta.monto)}`}
+        `;
+        
+        alertasContenedor.appendChild(alertaDiv);
+    });
+}
+
+// Función para marcar deuda como pagada
+function marcarComoPagada(deudaId) {
+    mostrarConfirmacion('¿Marcar esta deuda como pagada?').then(confirmado => {
+        if (confirmado) {
+            const deudas = obtenerDeudas();
+            const deuda = deudas.find(d => d.id === deudaId);
+            
+            if (deuda) {
+                deuda.estado = ESTADOS_DEUDA.PAGADA;
+                deuda.fechaPago = new Date().toISOString();
+                guardarDeudas(deudas);
+                cargarDeudas();
+                mostrarToast('✅ Deuda marcada como pagada', 'success');
+            }
+        }
+    });
+}
+
+// Función para eliminar deuda
+function eliminarDeuda(deudaId) {
+    mostrarConfirmacion('¿Estás seguro de que quieres eliminar esta deuda?').then(confirmado => {
+        if (confirmado) {
+            const deudas = obtenerDeudas();
+            const nuevasDeudas = deudas.filter(d => d.id !== deudaId);
+            guardarDeudas(nuevasDeudas);
+            cargarDeudas();
+            mostrarToast('✅ Deuda eliminada', 'success');
+        }
+    });
+}
+
+// Función para calcular intereses simples
+function calcularIntereses() {
+    const capital = parseFloat(document.getElementById('capitalInteres').value);
+    const tasa = parseFloat(document.getElementById('tasaInteresCalc').value);
+    const periodo = parseFloat(document.getElementById('periodoInteres').value);
+
+    if (isNaN(capital) || isNaN(tasa) || isNaN(periodo)) {
+        mostrarToast('❌ Ingresa valores válidos', 'danger');
+        return;
+    }
+
+    if (capital <= 0 || tasa < 0 || periodo <= 0) {
+        mostrarToast('❌ Los valores deben ser mayores a cero', 'danger');
+        return;
+    }
+
+    const interes = (capital * tasa * periodo) / 100;
+    const montoFinal = capital + interes;
+
+    document.getElementById('montoFinalInteres').value = formatNumberVE(montoFinal);
+    mostrarToast(`💰 Intereses: ${formatNumberVE(interes)} • Total: ${formatNumberVE(montoFinal)}`, 'success');
+}
+
+// Función para generar plan de pagos en PDF
+function generarPlanPagosPDF() {
+    const deudaId = document.getElementById('deudaParaPlan').value;
+    const numPagos = parseInt(document.getElementById('numPagos').value);
+    const frecuencia = document.getElementById('frecuenciaPagos').value;
+
+    if (!deudaId || !numPagos) {
+        mostrarToast('❌ Selecciona una deuda y número de pagos', 'danger');
+        return;
+    }
+
+    const deudas = obtenerDeudas();
+    const deuda = deudas.find(d => d.id === deudaId);
+    
+    if (!deuda) {
+        mostrarToast('❌ Deuda no encontrada', 'danger');
+        return;
+    }
+
+    // Crear contenido del PDF
+    const contenido = generarContenidoPlanPagos(deuda, numPagos, frecuencia);
+    
+    // Crear y descargar PDF (usando jsPDF si está disponible)
+    if (typeof jspdf !== 'undefined') {
+        const { jsPDF } = jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(16);
+        doc.text('PLAN DE PAGOS', 20, 20);
+        
+        doc.setFontSize(12);
+        doc.text(`Deuda: ${deuda.nombre}`, 20, 35);
+        doc.text(`Monto total: Bs. ${formatNumberVE(deuda.monto)}`, 20, 45);
+        doc.text(`Número de pagos: ${numPagos}`, 20, 55);
+        doc.text(`Frecuencia: ${frecuencia}`, 20, 65);
+        
+        doc.setFontSize(10);
+        let yPosition = 85;
+        
+        contenido.forEach((pago, index) => {
+            if (yPosition > 250) {
+                doc.addPage();
+                yPosition = 20;
+            }
+            
+            doc.text(`Pago ${index + 1}: ${pago.fecha} - Bs. ${formatNumberVE(pago.monto)}`, 20, yPosition);
+            yPosition += 10;
+        });
+        
+        doc.save(`plan_pagos_${deuda.nombre.replace(/\s+/g, '_')}.pdf`);
+        mostrarToast('📄 PDF generado exitosamente', 'success');
+    } else {
+        mostrarToast('❌ Librería jsPDF no disponible', 'danger');
+    }
+}
+
+// Función para generar contenido del plan de pagos
+function generarContenidoPlanPagos(deuda, numPagos, frecuencia) {
+    const pagos = [];
+    const montoPorPago = deuda.monto / numPagos;
+    const fechaInicio = new Date();
+    
+    for (let i = 0; i < numPagos; i++) {
+        const fechaPago = new Date(fechaInicio);
+        
+        switch (frecuencia) {
+            case 'mensual':
+                fechaPago.setMonth(fechaPago.getMonth() + i);
+                break;
+            case 'quincenal':
+                fechaPago.setDate(fechaPago.getDate() + (i * 15));
+                break;
+            case 'semanal':
+                fechaPago.setDate(fechaPago.getDate() + (i * 7));
+                break;
+        }
+        
+        pagos.push({
+            fecha: fechaPago.toLocaleDateString(),
+            monto: montoPorPago
+        });
+    }
+    
+    return pagos;
+}
+
+// Función para mostrar ayuda sobre deudas
+function mostrarAyudaDeudas() {
+    mostrarToast('💡 Gestiona tus préstamos personales: registra deudas que tienes o dinero que te deben', 'info');
+}
+
+// Función para actualizar selector de deudas
+function actualizarSelectorDeudas() {
+    const selector = document.getElementById('deudaParaPlan');
+    const deudas = obtenerDeudas();
+    
+    selector.innerHTML = '<option value="">Selecciona una deuda</option>';
+    
+    deudas.filter(d => d.estado === ESTADOS_DEUDA.PENDIENTE).forEach(deuda => {
+        const option = document.createElement('option');
+        option.value = deuda.id;
+        option.textContent = `${deuda.nombre} - Bs. ${formatNumberVE(deuda.monto)}`;
+        selector.appendChild(option);
+    });
+}
+
+// Eventos para mostrar/ocultar campos adicionales
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxInteres = document.getElementById('tieneInteres');
+    const checkboxVencimiento = document.getElementById('tieneFechaVencimiento');
+    
+    if (checkboxInteres) {
+        checkboxInteres.addEventListener('change', function() {
+            document.getElementById('camposInteres').style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    if (checkboxVencimiento) {
+        checkboxVencimiento.addEventListener('change', function() {
+            document.getElementById('camposVencimiento').style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Cargar deudas cuando se muestra la pestaña
+    const deudasTab = document.querySelector('[onclick="mostrarSideTab(\'deudas\')"]');
+    if (deudasTab) {
+        deudasTab.addEventListener('click', cargarDeudas);
+    }
+    
+    // También cargar si ya estamos en deudas
+    if (document.getElementById('side-deudas').classList.contains('active')) {
+        cargarDeudas();
+    }
+});
+
+function cerrarAyudaCalendario() {
+    document.getElementById('modalAyudaCalendario').style.display = 'none';
+}
+
+// ✅ Función mejorada con contexto global
+function reproducirSonidoCambioPestana() {
+    if (!sonidosActivados) return; // No reproducir si están desactivados
+    try {
+        // Usar contexto global si existe, sino crear uno nuevo
+        const audioContext = audioContextGlobal || new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Crear oscilador para generar sonido sutil
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        // Configurar sonido tipo "click" sutil
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.08);
+        
+        // Configurar volumen bajo
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.08);
+        
+        // Conectar y reproducir
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.08);
+        
+        console.log('✅ Sonido generado con Web Audio API');
+        
+    } catch (error) {
+        console.error('❌ Error con Web Audio API:', error.message);
+        mostrarIndicadorSonido();
+    }
+}
+
+// ✅ Función auxiliar para indicador visual
+function mostrarIndicadorSonido() {
+    const titulo = document.querySelector('h1');
+    if (titulo && !titulo.textContent.includes('🎵')) {
+        const textoOriginal = titulo.textContent;
+        titulo.textContent = '🎵 ' + textoOriginal;
+        setTimeout(() => {
+            titulo.textContent = textoOriginal;
+        }, 300);
+    }
+}
+
+// ✅ Variable global para el contexto de audio
+let audioContextGlobal = null;
+
+// ✅ Inicializar audio después de la primera interacción del usuario
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para crear contexto de audio después de interacción
+    const inicializarAudio = () => {
+        try {
+            if (!audioContextGlobal) {
+                audioContextGlobal = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('✅ AudioContext creado correctamente');
+            }
+            // Remover listeners después de inicializar
+            document.removeEventListener('click', inicializarAudio);
+            document.removeEventListener('keydown', inicializarAudio);
+            document.removeEventListener('touchstart', inicializarAudio);
+        } catch (error) {
+            console.log('❌ Error inicializando AudioContext:', error.message);
+        }
+    };
+    
+    // Escuchar primera interacción del usuario
+    document.addEventListener('click', inicializarAudio);
+    document.addEventListener('keydown', inicializarAudio);
+    document.addEventListener('touchstart', inicializarAudio);
+});
+
+// ✅ Variable global para controlar sonidos
+let sonidosActivados = true;
+
+// ✅ Función para probar sonido
+function probarSonido() {
+    if (sonidosActivados) {
+        reproducirSonidoCambioPestana();
+    }
+}
+
+// ✅ Función para guardar configuración de sonidos
+function guardarConfiguracionSonidos() {
+    sonidosActivados = document.getElementById('sonidosActivados').checked;
+    localStorage.setItem('sonidosActivados', sonidosActivados.toString());
+    mostrarToast(sonidosActivados ? '🔊 Sonidos activados' : '🔇 Sonidos desactivados', 'success');
+}
+
+// ✅ Función para cargar configuración de sonidos
+function cargarConfiguracionSonidos() {
+    const guardado = localStorage.getItem('sonidosActivados');
+    sonidosActivados = guardado !== 'false'; // Por defecto activados
+    const checkbox = document.getElementById('sonidosActivados');
+    if (checkbox) {
+        checkbox.checked = sonidosActivados;
+    }
+}
+
+// ✅ Inicializar configuración de sonidos al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    cargarConfiguracionSonidos();
+});
+
+// ✅ AÑADIR: Botón de limpiar búsqueda (Versión Mejorada)
+const buscador = document.getElementById('buscadorMovimientos');
+const botonLimpiar = document.getElementById('limpiarBusqueda');
+
+if (buscador && botonLimpiar) {
+    // Función para actualizar la visibilidad del botón
+    function actualizarBotonLimpiar() {
+        if (buscador.value.trim().length > 0) {
+            botonLimpiar.style.display = 'flex'; // Muestra el botón
+        } else {
+            botonLimpiar.style.display = 'none'; // Oculta el botón
+        }
+    }
+
+    // Escuchar cambios en el campo de búsqueda (al escribir)
+    buscador.addEventListener('input', actualizarBotonLimpiar);
+
+    // Escuchar también cuando se pega texto
+    buscador.addEventListener('paste', function() {
+        setTimeout(actualizarBotonLimpiar, 10);
+    });
+
+    // Escuchar cuando se borra el texto con la tecla "Supr" o "Backspace"
+    buscador.addEventListener('keydown', function(e) {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            // Esperamos un poco para que el valor del input se actualice
+            setTimeout(actualizarBotonLimpiar, 1);
+        }
+    });
+
+    // Función para limpiar el campo y la búsqueda
+    botonLimpiar.addEventListener('click', function(e) {
+        e.stopPropagation(); // Evita que el click se propague y active el input
+        buscador.value = '';
+        actualizarBotonLimpiar(); // Actualiza el estado del botón (lo oculta)
+        buscarMovimientos(); // Llama a tu función de búsqueda con query vacío → renderizar()
+        buscador.focus(); // Devuelve el foco al campo para seguir escribiendo
+    });
+
+    // Inicializar: Si al cargar la página ya hay texto, mostrar el botón
+    actualizarBotonLimpiar();
+}
+
+// ✅ Función para mostrar/ocultar candado según estado del bloqueo
+function actualizarBotonBloqueo() {
+    const btnBloqueo = document.getElementById('btnBloqueoManual');
+    const bloqueoActivo = localStorage.getItem('bloqueoActivo') === 'true' && localStorage.getItem('bloqueoPIN');
+    
+    if (btnBloqueo) {
+        btnBloqueo.style.display = bloqueoActivo ? 'inline-block' : 'none';
+    }
+}
+
+// ✅ Función para bloquear manualmente
+function bloquearManual() {
+    if (localStorage.getItem('bloqueoActivo') === 'true' && localStorage.getItem('bloqueoPIN')) {
+        // Remover estado desbloqueado para forzar bloqueo
+        localStorage.removeItem('bloqueoDesbloqueado');
+        mostrarModalBloqueo();
+    }
+}
+
+// ✅ Inicializar candado al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarBotonBloqueo();
+    
+    // Agregar evento al botón candado
+    const btnBloqueo = document.getElementById('btnBloqueoManual');
+    if (btnBloqueo) {
+        btnBloqueo.addEventListener('click', bloquearManual);
+    }
+});
+
+// ✅ Función para obtener tasas del BCV
+async function obtenerTasasBCV() {
+    const btn = document.querySelector('[onclick="obtenerTasasBCV()"]');
+    const textoOriginal = btn.textContent;
+
+    try {
+        // Mostrar loading
+        btn.textContent = '⏳ Consultando...';
+        btn.disabled = true;
+
+        // Obtener HTML desde BCV usando proxy
+        const htmlDesdeBCV = await obtenerHTMLDesdeBCV();
+
+        if (htmlDesdeBCV) {
+            // Obtener tasas del BCV (método scraping respetuoso)
+            const tasas = await consultarTasasBCV(htmlDesdeBCV);
+            document.getElementById('tasaBCV').textContent = formatNumberVE(tasas.dolar);
+            document.getElementById('fechaBCV').textContent = `Actualizado: ${new Date().toLocaleString('es-ES')}`;
+            
+            document.getElementById('tasaBCVEUR').textContent = formatNumberVE(tasas.euro);
+            document.getElementById('fechaBCVEUR').textContent = `Actualizado: ${new Date().toLocaleString('es-ES')}`;
+            
+            // Guardar en historial
+            guardarHistorialTasas(tasas);
+            
+            mostrarToast('✅ Tasas del BCV actualizadas', 'success');
+        } else {
+            mostrarToast('❌ No se pudieron obtener las tasas', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error obteniendo tasas BCV:', error);
+        mostrarToast('❌ Error consultando BCV', 'error');
+    } finally {
+        // Restaurar botón
+        btn.textContent = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+async function obtenerHTMLDesdeBCV() {
+    const urls = [
+        'https://r.jina.ai/https://www.bcv.org.ve/',
+        'https://r.jina.ai/http://www.bcv.org.ve/',
+        'https://api.allorigins.win/raw?url=https%3A%2F%2Fwww.bcv.org.ve%2F'
+    ];
+
+    for (const url of urls) {
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                },
+                cache: 'no-store'
+            });
+
+            if (response.ok) {
+                const html = await response.text();
+                if (html && html.includes('USD') && html.includes('EUR')) {
+                    console.log(`✅ HTML del BCV obtenido desde proxy: ${url}`);
+                    return html;
+                }
+            } else {
+                console.warn(`⚠️ Proxy BCV respondió ${response.status} (${url})`);
+            }
+        } catch (error) {
+            console.warn(`⚠️ Error usando proxy BCV (${url}):`, error.message);
+        }
+    }
+
+    return null;
+}
+
+async function consultarTasasBCV() {
+    try {
+        console.log('🔍 Consultando tasas oficiales del BCV...');
+
+        // Método 1: Intentar directamente desde la página oficial del BCV usando un proxy sin CORS
+        try {
+            const bcvHtml = await obtenerHTMLDesdeBCV();
+
+            if (bcvHtml) {
+                const dolarRegex = /USD[^\d]*(\d{1,3}(?:\.\d{3})*,\d{2})/s;
+                const euroRegex = /EUR[^\d]*(\d{1,3}(?:\.\d{3})*,\d{2})/s;
+
+                const dolarMatch = bcvHtml.match(dolarRegex);
+                const euroMatch = bcvHtml.match(euroRegex);
+
+                if (dolarMatch && euroMatch) {
+                    const dolar = parseFloat(dolarMatch[1].replace(/\./g, '').replace(',', '.'));
+                    const euro = parseFloat(euroMatch[1].replace(/\./g, '').replace(',', '.'));
+
+                    if (isFinite(dolar) && isFinite(euro)) {
+                        console.log(`🏦 Tasas oficiales BCV: USD ${dolar}, EUR ${euro}`);
+                        return {
+                            dolar,
+                            euro,
+                            fecha: new Date().toISOString(),
+                            fuente: 'BCV Oficial'
+                        };
+                    }
+                }
+            }
+        } catch (bcvError) {
+            console.log('⚠️ No se pudo obtener la tasa directamente del BCV:', bcvError.message);
+        }
+
+        // Método 2: Usar API pública de tasas como fallback
+        console.log('⚠️ BCV directo no disponible, intentando API pública...');
+        const apiUsdUrl = 'https://api.exchangerate-api.com/v4/latest/USD';
+        const apiEurUrl = 'https://api.exchangerate-api.com/v4/latest/EUR';
+        const fetchOptions = {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        };
+
+        let dataUSD = null;
+        let dataEUR = null;
+
+        try {
+            const responseUSD = await fetch(apiUsdUrl, fetchOptions);
+            if (responseUSD.ok) {
+                dataUSD = await responseUSD.json();
+            } else {
+                console.warn(`⚠️ API USD respondió ${responseUSD.status}`);
+            }
+        } catch (usdError) {
+            console.warn('⚠️ No se pudo obtener la tasa USD desde la API pública:', usdError.message);
+        }
+
+        try {
+            const responseEUR = await fetch(apiEurUrl, fetchOptions);
+            if (responseEUR.ok) {
+                dataEUR = await responseEUR.json();
+            } else {
+                console.warn(`⚠️ API EUR respondió ${responseEUR.status}`);
+            }
+        } catch (eurError) {
+            console.warn('⚠️ No se pudo obtener la tasa EUR desde la API pública:', eurError.message);
+        }
+
+        let tasaUSD = dataUSD?.rates?.VES ?? null;
+        let tasaEUR = dataEUR?.rates?.VES ?? null;
+        let fuente = 'API Pública (Exchangerate-api)';
+
+        // Si alguna de las tasas falta, intentar derivarla de la otra respuesta
+        if (!tasaEUR && dataUSD?.rates?.EUR && tasaUSD) {
+            const eurDesdeUsd = dataUSD.rates.EUR;
+            if (eurDesdeUsd) {
+                tasaEUR = tasaUSD / eurDesdeUsd;
+                fuente = 'API Pública (EUR derivado de USD)';
+            }
+        }
+
+        if (!tasaUSD && dataEUR?.rates?.USD && tasaEUR) {
+            const usdDesdeEur = dataEUR.rates.USD;
+            if (usdDesdeEur) {
+                tasaUSD = tasaEUR / usdDesdeEur;
+                fuente = 'API Pública (USD derivado de EUR)';
+            }
+        }
+
+        if (isFinite(tasaUSD) && isFinite(tasaEUR) && tasaUSD > 0 && tasaEUR > 0) {
+            console.log(`💱 Tasas desde API pública: USD ${tasaUSD}, EUR ${tasaEUR}`);
+            return {
+                dolar: tasaUSD,
+                euro: tasaEUR,
+                fecha: new Date().toISOString(),
+                fuente
+            };
+        }
+
+        // Método 3: Fallback con datos aproximados
+        console.log('⚠️ API pública falló, usando valores aproximados...');
+        return {
+            dolar: 179.43,
+            euro: 195.20,
+            fecha: new Date().toISOString(),
+            fuente: 'Aproximado'
+        };
+
+    } catch (error) {
+        console.error('❌ Error general consultando tasas:', error);
+
+        // Fallback final: datos aproximados
+        return {
+            dolar: 179.43,
+            euro: 195.20,
+            fecha: new Date().toISOString(),
+            fuente: 'Offline'
+        };
+    }
+}
+
+// ✅ Función para usar tasa en el sistema
+function usarTasaBCV() {
+    const tasaBCV = document.getElementById('tasaBCV').textContent;
+    
+    if (tasaBCV === '--') {
+        mostrarToast('❌ Primero obtén las tasas del BCV', 'warning');
+        return;
+    }
+    
+    // Usar la tasa en el campo principal
+    const inputTasa = document.getElementById('tasaCambio');
+    if (inputTasa) {
+        const tasaLimpia = tasaBCV.replace(/\./g, '').replace('.', ',');
+        inputTasa.value = tasaLimpia;
+        actualizarEquivalente();
+        mostrarToast('✅ Tasa del BCV aplicada al sistema', 'success');
+    }
+}
+
+// ✅ Función para guardar historial de tasas
+function guardarHistorialTasas(tasas) {
+    const historial = JSON.parse(localStorage.getItem('historialBCV') || '[]');
+    
+    const nuevaEntrada = {
+        fecha: new Date().toISOString(),
+        dolar: tasas.dolar,
+        euro: tasas.euro
+    };
+    
+    historial.unshift(nuevaEntrada);
+    
+    // Mantener solo últimas 7 entradas
+    if (historial.length > 7) {
+        historial.pop();
+    }
+    
+    localStorage.setItem('historialBCV', JSON.stringify(historial));
+    mostrarHistorialTasas();
+}
+
+// ✅ Función para mostrar historial
+function mostrarHistorialTasas() {
+    const historial = JSON.parse(localStorage.getItem('historialBCV') || '[]');
+    const contenedor = document.getElementById('historialTasas');
+    
+    if (historial.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: var(--text-light); font-style: italic;">No hay historial aún. Consulta algunas tasas.</p>';
+        return;
+    }
+    
+    contenedor.innerHTML = historial.map((entrada, index) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: ${index === 0 ? 'var(--primary-bg)' : 'transparent'}; border-radius: 6px; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.8rem; color: var(--text-light);">${new Date(entrada.fecha).toLocaleDateString('es-ES')}</span>
+            <span style="font-weight: 500;">USD: ${formatNumberVE(entrada.dolar)} | EUR: ${formatNumberVE(entrada.euro)}</span>
+        </div>
+    `).join('');
+}
+
+// ✅ Inicializar historial al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    mostrarHistorialTasas();
+});
+
+// ✅ Función para limpiar historial de tasas
+function limpiarHistorialBCV() {
+    if (!confirm('¿Estás seguro de que quieres borrar todo el historial de tasas del BCV? Esta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        // Limpiar historial del localStorage
+        localStorage.removeItem('historialBCV');
+        
+        // Actualizar interfaz
+        mostrarHistorialTasas();
+        
+        mostrarToast('✅ Historial de tasas borrado completamente', 'success');
+        
+    } catch (error) {
+        console.error('Error limpiando historial:', error);
+        mostrarToast('❌ Error al borrar historial', 'error');
+    }
+}
+
+// ✅ Función para mostrar ayuda de tasas BCV
+function mostrarAyudaBCV() {
+    const modal = document.getElementById('modalAyudaBCV');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+// ✅ Funciones para gestión de metas de ahorro
+function crearMetaAhorro() {
+    const nombre = document.getElementById('nombreMeta').value.trim();
+    const monto = document.getElementById('montoMeta').value.trim();
+    const fecha = document.getElementById('fechaMeta').value;
+    
+    if (!nombre || !monto || !fecha) {
+        mostrarToast('❌ Completa todos los campos', 'error');
+        return;
+    }
+    
+    const montoNum = parseFloat(monto.replace(/[.,]/g, ''));
+    if (isNaN(montoNum) || montoNum <= 0) {
+        mostrarToast('❌ Ingresa un monto válido', 'error');
+        return;
+    }
+    
+    const fechaLimite = new Date(fecha);
+    const hoy = new Date();
+    if (fechaLimite <= hoy) {
+        mostrarToast('❌ La fecha debe ser futura', 'error');
+        return;
+    }
+    
+    const meta = {
+        id: Date.now(),
+        nombre,
+        montoObjetivo: montoNum,
+        montoActual: 0,
+        fechaLimite,
+        fechaCreacion: new Date(),
+        activa: true
+    };
+    
+    const metas = JSON.parse(localStorage.getItem('metasAhorro') || '[]');
+    metas.push(meta);
+    localStorage.setItem('metasAhorro', JSON.stringify(metas));
+    
+    // Limpiar formulario
+    document.getElementById('nombreMeta').value = '';
+    document.getElementById('montoMeta').value = '';
+    document.getElementById('fechaMeta').value = '';
+    
+    cargarMetasAhorro();
+    actualizarProgresoGeneral();
+    generarSugerenciasAhorro();
+    
+    mostrarToast(`✅ Meta "${nombre}" creada`, 'success');
+}
+
+function cargarMetasAhorro() {
+    const contenedor = document.getElementById('listaMetasAhorro');
+    const metas = JSON.parse(localStorage.getItem('metasAhorro') || '[]');
+    
+    if (metas.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: var(--text-light); font-style: italic;">No tienes metas de ahorro aún. ¡Crea tu primera meta!</p>';
+        return;
+    }
+    
+    let html = '';
+    metas.forEach(meta => {
+        const progreso = (meta.montoActual / meta.montoObjetivo) * 100;
+        const diasRestantes = Math.ceil((meta.fechaLimite - new Date()) / (1000 * 60 * 60 * 24));
+        const ahorroMensual = meta.montoObjetivo / Math.ceil((meta.fechaLimite - new Date()) / (1000 * 60 * 60 * 24 * 30));
+        
+        html += `
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: var(--card-bg);">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0 0 0.25rem 0; color: var(--text);">${meta.nombre}</h4>
+                        <p style="margin: 0; color: var(--text-light); font-size: 0.8rem;">
+                            🎯 Bs. ${formatearNumero(meta.montoActual)} / Bs. ${formatearNumero(meta.montoObjetivo)}
+                        </p>
+                        <p style="margin: 0; color: var(--text-light); font-size: 0.8rem;">
+                            📅 ${diasRestantes} días restantes | 💰 Bs. ${formatearNumero(ahorroMensual)}/mes
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button onclick="agregarProgresoMeta(${meta.id})" style="background: #10B981; color: white; border: none; border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; cursor: pointer;" title="Agregar progreso">
+                            ➕
+                        </button>
+                        <button onclick="editarMetaAhorro(${meta.id})" style="background: #ff9800; color: white; border: none; border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; cursor: pointer;" title="Editar meta">
+                            ✏️
+                        </button>
+                        <button onclick="eliminarMetaAhorro(${meta.id})" style="background: #dc2626; color: white; border: none; border-radius: 6px; padding: 0.5rem; font-size: 0.8rem; cursor: pointer;" title="Eliminar meta">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+                <div style="width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: ${Math.min(progreso, 100)}%; background: linear-gradient(90deg, #10B981, #059669); transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+        `;
+    });
+    
+    contenedor.innerHTML = html;
+}
+
+function actualizarProgresoGeneral() {
+    const metas = JSON.parse(localStorage.getItem('metasAhorro') || '[]');
+    const activas = metas.filter(m => m.activa);
+    
+    if (activas.length === 0) {
+        document.getElementById('barraProgresoGeneral').style.width = '0%';
+        document.getElementById('textoProgresoGeneral').textContent = 'Bs. 0 / Bs. 0 (0%)';
+        return;
+    }
+    
+    const totalObjetivo = activas.reduce((sum, meta) => sum + meta.montoObjetivo, 0);
+    const totalActual = activas.reduce((sum, meta) => sum + meta.montoActual, 0);
+    const progreso = (totalActual / totalObjetivo) * 100;
+    
+    document.getElementById('barraProgresoGeneral').style.width = `${Math.min(progreso, 100)}%`;
+    document.getElementById('textoProgresoGeneral').textContent = 
+        `Bs. ${formatearNumero(totalActual)} / Bs. ${formatearNumero(totalObjetivo)} (${progreso.toFixed(1)}%)`;
+}
+
+function generarSugerenciasAhorro() {
+    const sugerenciasContainer = document.getElementById('sugerenciasContainer');
+    
+    // Aquí iría la lógica para analizar gastos y generar sugerencias
+    sugerenciasContainer.innerHTML = `
+        <div style="margin-bottom: 0.75rem;">
+            <strong>☕ Si dejas de gastar en cafés:</strong><br>
+            <span style="font-size: 0.9rem;">Podrías ahorrar Bs. 2,400 en 6 meses</span>
+        </div>
+        <div style="margin-bottom: 0.75rem;">
+            <strong>🍔 Reduce comidas fuera:</strong><br>
+            <span style="font-size: 0.9rem;">Ahorra Bs. 4,800 mensuales hacia tu meta</span>
+        </div>
+        <div style="margin-bottom: 0.75rem;">
+            <strong>💡 Optimiza suscripciones:</strong><br>
+            <span style="font-size: 0.9rem;">Libera Bs. 1,200 al mes</span>
+        </div>
+    `;
+}
+
+function mostrarAyudaAhorro() {
+    // Función para mostrar ayuda de la pestaña ahorro
+    mostrarToast('💡 La pestaña de ahorro te ayuda a establecer metas y seguir tu progreso', 'info');
+}
+
+// ======================================================================================
+// ✅ FUNCIONES PARA OPTIMIZACIÓN FISCAL SIMPLIFICADA
+// ======================================================================================
+
+/**
+ * Clasificador automático de gastos deducibles
+ * Analiza movimientos existentes para identificar gastos potencialmente deducibles
+ */
+function clasificarGastosDeducibles() {
+    try {
+        // Obtener todos los movimientos de la base de datos
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readonly');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+        const request = store.getAll();
+
+        request.onsuccess = function(event) {
+            const movimientos = event.target.result;
+            const gastos = movimientos.filter(mov => mov.tipo === 'gasto');
+            
+            if (gastos.length === 0) {
+                mostrarToast('❌ No hay gastos registrados para analizar', 'danger');
+                return;
+            }
+
+            // Reglas de clasificación fiscal
+            const reglasFiscales = {
+                'educacion': {
+                    palabras: ['universidad', 'colegio', 'escuela', 'curso', 'diploma', 'maestria', 'doctorado', 'libro', 'material educativo', 'matricula'],
+                    porcentaje: 100,
+                    descripcion: 'Gastos educativos y de formación'
+                },
+                'salud': {
+                    palabras: ['medico', 'medicina', 'farmacia', 'hospital', 'clinica', 'consulta', 'examen', 'laboratorio', 'dentista', 'optica', 'terapia'],
+                    porcentaje: 100,
+                    descripcion: 'Gastos médicos y de salud'
+                },
+                'vivienda': {
+                    palabras: ['alquiler', 'hipoteca', 'luz', 'agua', 'gas', 'telefono', 'internet', 'mantenimiento', 'reparacion hogar'],
+                    porcentaje: 80,
+                    descripcion: 'Gastos de vivienda y servicios básicos'
+                },
+                'transporte': {
+                    palabras: ['transporte', 'gasolina', 'metro', 'bus', 'taxi', 'uber', 'mantenimiento vehiculo', 'seguro auto'],
+                    porcentaje: 70,
+                    descripcion: 'Gastos de transporte y movilidad'
+                },
+                'donaciones': {
+                    palabras: ['donacion', 'caridad', 'ayuda', 'beneficencia', 'iglesia', 'fundacion'],
+                    porcentaje: 100,
+                    descripcion: 'Donaciones y obras de caridad'
+                }
+            };
+
+            // Clasificar gastos
+            const gastosClasificados = [];
+            let totalDeducible = 0;
+
+            gastos.forEach(gasto => {
+                const concepto = gasto.concepto.toLowerCase();
+                let clasificacion = null;
+                let porcentajeMaximo = 0;
+
+                // Buscar coincidencias con reglas fiscales
+                Object.keys(reglasFiscales).forEach(categoria => {
+                    const regla = reglasFiscales[categoria];
+                    const tieneCoincidencia = regla.palabras.some(palabra => 
+                        concepto.includes(palabra.toLowerCase())
+                    );
+                    
+                    if (tieneCoincidencia && regla.porcentaje > porcentajeMaximo) {
+                        porcentajeMaximo = regla.porcentaje;
+                        clasificacion = {
+                            categoria: categoria,
+                            descripcion: regla.descripcion,
+                            porcentaje: regla.porcentaje,
+                            monto: gasto.cantidad,
+                            concepto: gasto.concepto
+                        };
+                    }
+                });
+
+                if (clasificacion) {
+                    gastosClasificados.push(clasificacion);
+                    totalDeducible += (gasto.cantidad * clasificacion.porcentaje / 100);
+                }
+            });
+
+            // Mostrar resultados
+            mostrarResultadosClasificacion(gastosClasificados, totalDeducible, gastos.length);
+
+        };
+
+        request.onerror = function() {
+            mostrarToast('❌ Error al acceder a los movimientos', 'danger');
+        };
+
+    } catch (error) {
+        mostrarToast('❌ Error al clasificar gastos: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * Mostrar resultados de clasificación fiscal
+ */
+function mostrarResultadosClasificacion(gastosClasificados, totalDeducible, totalGastos) {
+    const resultadoDiv = document.getElementById('resultadoClasificacion');
+    const resumenDiv = document.getElementById('resumenDeducibles');
+    
+    if (gastosClasificados.length === 0) {
+        resumenDiv.innerHTML = `
+            <p>❌ No se encontraron gastos potencialmente deducibles.</p>
+            <p>Analizados: ${totalGastos} gastos</p>
+        `;
+    } else {
+        const ahorroEstimado = totalDeducible * 0.34; // Asumiendo tasa del 34%
+        
+        resumenDiv.innerHTML = `
+            <p>✅ <strong>${gastosClasificados.length}</strong> gastos potencialmente deducibles encontrados</p>
+            <p>💰 <strong>Monto total deducible:</strong> Bs. ${formatNumberVE(totalDeducible)}</p>
+            <p>🎯 <strong>Ahorro fiscal estimado:</strong> Bs. ${formatNumberVE(ahorroEstimado)}</p>
+            <p>📊 <strong>Eficiencia fiscal:</strong> ${Math.round((gastosClasificados.length / totalGastos) * 100)}%</p>
+        `;
+
+        // Agregar detalles de cada gasto clasificado
+        let detallesHTML = '<div style="margin-top: 1rem; max-height: 200px; overflow-y: auto;">';
+        gastosClasificados.forEach(gasto => {
+            detallesHTML += `
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 6px; border-left: 3px solid #10B981;">
+                    <strong>${gasto.concepto}</strong><br>
+                    <small>🏷️ ${gasto.descripcion} | 💰 Bs. ${formatNumberVE(gasto.monto)} | 📈 ${gasto.porcentaje}% deducible</small>
+                </div>
+            `;
+        });
+        detallesHTML += '</div>';
+        resumenDiv.innerHTML += detallesHTML;
+    }
+    
+    resultadoDiv.style.display = 'block';
+}
+
+/**
+ * Simulador de escenarios fiscales
+ */
+function simularEscenarioFiscal() {
+    const ingresosProyectados = parseNumberVE(document.getElementById('ingresosProyectados').value);
+    const gastosDeduciblesProyectados = parseNumberVE(document.getElementById('gastosDeduciblesProyectados').value);
+    
+    if (isNaN(ingresosProyectados) || ingresosProyectados <= 0) {
+        mostrarToast('❌ Ingresa ingresos anuales válidos', 'danger');
+        return;
+    }
+    
+    if (isNaN(gastosDeduciblesProyectados) || gastosDeduciblesProyectados < 0) {
+        mostrarToast('❌ Ingresa gastos deducibles válidos', 'danger');
+        return;
+    }
+
+    // Escenarios fiscales (tasas progresivas aproximadas)
+    const escenarios = [
+        {
+            nombre: 'Conservador',
+            tasa: 0.32,
+            descripcion: 'Con deducciones mínimas aplicadas'
+        },
+        {
+            nombre: 'Realista', 
+            tasa: 0.28,
+            descripcion: 'Con deducciones estándar aplicadas'
+        },
+        {
+            nombre: 'Optimizado',
+            tasa: 0.24,
+            descripcion: 'Con máximas deducciones fiscales aplicadas'
+        }
+    ];
+
+    // Calcular resultados para cada escenario
+    const resultados = escenarios.map(escenario => {
+        const baseImponible = ingresosProyectados - gastosDeduciblesProyectados;
+        const impuestoEstimado = Math.max(0, baseImponible * escenario.tasa);
+        const ahorroFiscal = (ingresosProyectados * 0.34) - impuestoEstimado; // Comparado con tasa máxima
+        
+        return {
+            ...escenario,
+            baseImponible: baseImponible,
+            impuestoEstimado: impuestoEstimado,
+            ahorroFiscal: ahorroFiscal
+        };
+    });
+
+    mostrarResultadosSimulacion(resultados);
+}
+
+/**
+ * Mostrar resultados de simulación fiscal
+ */
+function mostrarResultadosSimulacion(resultados) {
+    const resultadoDiv = document.getElementById('resultadoSimulacion');
+    const detalleDiv = document.getElementById('detalleSimulacion');
+    
+    let html = '<div style="margin-bottom: 1rem;">';
+    html += '<p><strong>📊 Comparación de Escenarios Fiscales</strong></p>';
+    html += '</div>';
+    
+    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">';
+    
+    resultados.forEach(resultado => {
+        const ahorroColor = resultado.ahorroFiscal > 0 ? '#10B981' : '#EF4444';
+        html += `
+            <div style="background: rgba(59, 130, 246, 0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid #3B82F6;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #3B82F6;">${resultado.nombre}</h4>
+                <p style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.5rem;">${resultado.descripcion}</p>
+                <p><strong>Base imponible:</strong> Bs. ${formatNumberVE(resultado.baseImponible)}</p>
+                <p><strong>Impuesto estimado:</strong> Bs. ${formatNumberVE(resultado.impuestoEstimado)}</p>
+                <p style="color: ${ahorroColor};"><strong>Ahorro fiscal:</strong> Bs. ${formatNumberVE(resultado.ahorroFiscal)}</p>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    detalleDiv.innerHTML = html;
+    resultadoDiv.style.display = 'block';
+}
+
+/**
+ * Proyección de impuesto anual
+ */
+function proyectarImpuestoAnual() {
+    try {
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readonly');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+        const request = store.getAll();
+
+        request.onsuccess = function(event) {
+            const movimientos = event.target.result;
+            const ingresos = movimientos.filter(mov => mov.tipo === 'ingreso');
+            const gastos = movimientos.filter(mov => mov.tipo === 'gasto');
+            
+            if (ingresos.length === 0) {
+                mostrarToast('❌ Necesitas ingresos registrados para hacer proyecciones', 'danger');
+                return;
+            }
+
+            // Calcular proyecciones basadas en datos actuales
+            const mesesConDatos = calcularMesesConDatos(movimientos);
+            const proyeccionAnual = calcularProyeccionAnual(ingresos, gastos, mesesConDatos);
+            
+            mostrarResultadosProyeccion(proyeccionAnual);
+        };
+
+    } catch (error) {
+        mostrarToast('❌ Error al proyectar impuestos: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * Calcular meses con datos para proyección
+ */
+function calcularMesesConDatos(movimientos) {
+    const meses = new Set();
+    movimientos.forEach(mov => {
+        const fecha = new Date(mov.fecha);
+        meses.add(fecha.getMonth());
+    });
+    return meses.size;
+}
+
+/**
+ * Calcular proyección anual basada en tendencias
+ */
+function calcularProyeccionAnual(ingresos, gastos, mesesConDatos) {
+    const ingresosMensuales = ingresos.reduce((sum, ing) => sum + ing.cantidad, 0) / mesesConDatos;
+    const gastosMensuales = gastos.reduce((sum, gas) => sum + gas.cantidad, 0) / mesesConDatos;
+    
+    const ingresosAnualesProyectados = ingresosMensuales * 12;
+    const gastosAnualesProyectados = gastosMensuales * 12;
+    const utilidadBrutaProyectada = ingresosAnualesProyectados - gastosAnualesProyectados;
+    
+    // Estimar gastos deducibles (30% promedio)
+    const gastosDeduciblesProyectados = gastosAnualesProyectados * 0.3;
+    const baseImponibleProyectada = utilidadBrutaProyectada - gastosDeduciblesProyectados;
+    
+    // Aplicar tasa fiscal progresiva aproximada
+    let impuestoProyectado = 0;
+    if (baseImponibleProyectada > 0) {
+        if (baseImponibleProyectada <= 100000) {
+            impuestoProyectado = baseImponibleProyectada * 0.15;
+        } else if (baseImponibleProyectada <= 300000) {
+            impuestoProyectado = 15000 + ((baseImponibleProyectada - 100000) * 0.25);
+        } else {
+            impuestoProyectado = 65000 + ((baseImponibleProyectada - 300000) * 0.34);
+        }
+    }
+
+    return {
+        ingresosAnuales: ingresosAnualesProyectados,
+        gastosAnuales: gastosAnualesProyectados,
+        utilidadBruta: utilidadBrutaProyectada,
+        gastosDeducibles: gastosDeduciblesProyectados,
+        baseImponible: baseImponibleProyectada,
+        impuestoProyectado: impuestoProyectado,
+        mesesBase: mesesConDatos
+    };
+}
+
+/**
+ * Mostrar resultados de proyección anual
+ */
+function mostrarResultadosProyeccion(proyeccion) {
+    const resultadoDiv = document.getElementById('resultadoProyeccion');
+    const detalleDiv = document.getElementById('detalleProyeccion');
+    
+    const html = `
+        <div style="margin-bottom: 1rem;">
+            <p><strong>📊 Proyección Anual basada en ${proyeccion.mesesBase} meses de datos</strong></p>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div style="text-align: center;">
+                <div style="font-size: 1.5rem; color: #10B981;">💰</div>
+                <p style="font-size: 0.8rem; color: var(--text-light);">Ingresos Anuales</p>
+                <p style="font-size: 1.1rem; font-weight: bold;">Bs. ${formatNumberVE(proyeccion.ingresosAnuales)}</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 1.5rem; color: #EF4444;">💸</div>
+                <p style="font-size: 0.8rem; color: var(--text-light);">Gastos Anuales</p>
+                <p style="font-size: 1.1rem; font-weight: bold;">Bs. ${formatNumberVE(proyeccion.gastosAnuales)}</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 1.5rem; color: #3B82F6;">📈</div>
+                <p style="font-size: 0.8rem; color: var(--text-light);">Utilidad Bruta</p>
+                <p style="font-size: 1.1rem; font-weight: bold;">Bs. ${formatNumberVE(proyeccion.utilidadBruta)}</p>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 1.5rem; color: #8B5CF6;">🎯</div>
+                <p style="font-size: 0.8rem; color: var(--text-light);">Impuesto Estimado</p>
+                <p style="font-size: 1.1rem; font-weight: bold; color: #F59E0B;">Bs. ${formatNumberVE(proyeccion.impuestoProyectado)}</p>
+            </div>
+        </div>
+        
+        <div style="background: rgba(245, 158, 11, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #F59E0B;">📋 Detalle de Cálculo</h4>
+            <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• Base imponible proyectada: Bs. ${formatNumberVE(proyeccion.baseImponible)}</p>
+            <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• Gastos deducibles estimados: Bs. ${formatNumberVE(proyeccion.gastosDeducibles)}</p>
+            <p style="font-size: 0.9rem;">• Tasa fiscal aplicada: ${proyeccion.impuestoProyectado > 0 ? 'Progresiva (15-34%)' : 'Sin impuesto (pérdidas)'}</p>
+        </div>
+    `;
+    
+    detalleDiv.innerHTML = html;
+    resultadoDiv.style.display = 'block';
+}
+
+/**
+ * Optimización de deducciones fiscales
+ */
+function optimizarDeducciones() {
+    try {
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readonly');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+        const request = store.getAll();
+
+        request.onsuccess = function(event) {
+            const movimientos = event.target.result;
+            const gastos = movimientos.filter(mov => mov.tipo === 'gasto');
+            
+            if (gastos.length === 0) {
+                mostrarToast('❌ No hay gastos para optimizar', 'danger');
+                return;
+            }
+
+            // Analizar oportunidades de optimización
+            const oportunidades = analizarOportunidadesDeduccion(gastos);
+            mostrarOportunidadesOptimizacion(oportunidades);
+        };
+
+    } catch (error) {
+        mostrarToast('❌ Error al optimizar deducciones: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * Analizar oportunidades de deducción
+ */
+function analizarOportunidadesDeduccion(gastos) {
+    const oportunidades = [];
+    
+    // Categorías con mayor potencial deductivo
+    const categoriasOptimizacion = {
+        'educacion': { prioridad: 'alta', beneficio: 100, sugerencia: 'Documentar todos los gastos educativos' },
+        'salud': { prioridad: 'alta', beneficio: 100, sugerencia: 'Guardar recibos de consultas médicas' },
+        'vivienda': { prioridad: 'media', beneficio: 80, sugerencia: 'Registrar gastos de mantenimiento del hogar' },
+        'donaciones': { prioridad: 'alta', beneficio: 100, sugerencia: 'Documentar todas las donaciones caritativas' },
+        'profesional': { prioridad: 'media', beneficio: 70, sugerencia: 'Registrar gastos de herramientas de trabajo' }
+    };
+
+    // Analizar gastos actuales vs potencial
+    Object.keys(categoriasOptimizacion).forEach(categoria => {
+        const categoriaInfo = categoriasOptimizacion[categoria];
+        const gastosCategoria = gastos.filter(gasto => 
+            gasto.concepto.toLowerCase().includes(categoria) ||
+            gasto.categoria?.toLowerCase().includes(categoria)
+        );
+        
+        const gastosNoDeducibles = gastos.filter(gasto => {
+            const concepto = gasto.concepto.toLowerCase();
+            return !Object.values(categoriasOptimizacion).some(cat => 
+                cat.palabras?.some(palabra => concepto.includes(palabra))
+            );
+        });
+
+        if (gastosCategoria.length > 0 || categoria === 'profesional') {
+            oportunidades.push({
+                categoria: categoria,
+                prioridad: categoriaInfo.prioridad,
+                beneficio: categoriaInfo.beneficio,
+                gastosActuales: gastosCategoria.length,
+                montoTotal: gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0),
+                sugerencia: categoriaInfo.sugerencia,
+                potencial: calcularPotencialOptimizacion(categoria, gastosCategoria)
+            });
+        }
+    });
+
+    return oportunidades.sort((a, b) => {
+        const prioridades = { 'alta': 3, 'media': 2, 'baja': 1 };
+        return prioridades[b.prioridad] - prioridades[a.prioridad];
+    });
+}
+
+/**
+ * Calcular potencial de optimización
+ */
+function calcularPotencialOptimizacion(categoria, gastosCategoria) {
+    if (gastosCategoria.length === 0) return 0;
+    
+    const montoTotal = gastosCategoria.reduce((sum, g) => sum + g.cantidad, 0);
+    const beneficioFiscal = montoTotal * 0.34; // Tasa promedio
+    
+    return beneficioFiscal;
+}
+
+/**
+ * Mostrar oportunidades de optimización
+ */
+function mostrarOportunidadesOptimizacion(oportunidades) {
+    const resultadoDiv = document.getElementById('resultadoOptimizacion');
+    const detalleDiv = document.getElementById('detalleOptimizacion');
+    
+    if (oportunidades.length === 0) {
+        detalleDiv.innerHTML = '<p>❌ No se encontraron oportunidades de optimización.</p>';
+    } else {
+        let html = '<div style="margin-bottom: 1rem;">';
+        html += `<p><strong>💡 ${oportunidades.length} oportunidades de optimización encontradas</strong></p>`;
+        html += '</div>';
+        
+        html += '<div style="space-y: 1rem;">';
+        
+        oportunidades.forEach(oportunidad => {
+            const prioridadColor = {
+                'alta': '#EF4444',
+                'media': '#F59E0B', 
+                'baja': '#10B981'
+            };
+            
+            html += `
+                <div style="background: rgba(139, 92, 246, 0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid #8B5CF6;">
+                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 0.5rem;">
+                        <h4 style="margin: 0; color: #8B5CF6;">${tituloCategoria(optunidad.categoria)}</h4>
+                        <span style="background: ${prioridadColor[oportunidad.prioridad]}; color: white; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+                            ${oportunidad.prioridad.toUpperCase()}
+                        </span>
+                    </div>
+                    <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 0.5rem;">${oportunidad.sugerencia}</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+                        <p><strong>Gastos actuales:</strong> ${oportunidad.gastosActuales}</p>
+                        <p><strong>Beneficio potencial:</strong> Bs. ${formatNumberVE(oportunidad.potencial)}</p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    }
+    
+    detalleDiv.innerHTML = html;
+    resultadoDiv.style.display = 'block';
+}
+
+/**
+ * Convertir nombre de categoría a título legible
+ */
+function tituloCategoria(categoria) {
+    const titulos = {
+        'educacion': '📚 Educación y Formación',
+        'salud': '🏥 Salud y Medicina',
+        'vivienda': '🏠 Vivienda y Servicios',
+        'donaciones': '🤝 Donaciones',
+        'profesional': '💼 Desarrollo Profesional'
+    };
+    return titulos[categoria] || categoria;
+}
+
+/**
+ * Generar recomendaciones de timing de gastos
+ */
+function generarRecomendacionesTiming() {
+    try {
+        const transaction = db.transaction([STORES.MOVIMIENTOS], 'readonly');
+        const store = transaction.objectStore(STORES.MOVIMIENTOS);
+        const request = store.getAll();
+
+        request.onsuccess = function(event) {
+            const movimientos = event.target.result;
+            const gastos = movimientos.filter(mov => mov.tipo === 'gasto');
+            
+            if (gastos.length === 0) {
+                mostrarToast('❌ No hay gastos para analizar timing', 'danger');
+                return;
+            }
+
+            // Analizar patrones de gastos por mes
+            const gastosPorMes = analizarGastosPorMes(gastos);
+            const recomendaciones = generarRecomendacionesBasadasEnPatrones(gastosPorMes);
+            
+            mostrarRecomendacionesTiming(recomendaciones);
+        };
+
+    } catch (error) {
+        mostrarToast('❌ Error al generar recomendaciones: ' + error.message, 'danger');
+    }
+}
+
+/**
+ * Analizar gastos por mes
+ */
+function analizarGastosPorMes(gastos) {
+    const gastosPorMes = {};
+    
+    gastos.forEach(gasto => {
+        const fecha = new Date(gasto.fecha);
+        const mes = fecha.getMonth();
+        
+        if (!gastosPorMes[mes]) {
+            gastosPorMes[mes] = [];
+        }
+        gastosPorMes[mes].push(gasto);
+    });
+    
+    return gastosPorMes;
+}
+
+/**
+ * Generar recomendaciones basadas en patrones
+ */
+function generarRecomendacionesBasadasEnPatrones(gastosPorMes) {
+    const recomendaciones = [];
+    const meses = Object.keys(gastosPorMes);
+    
+    if (meses.length < 2) {
+        recomendaciones.push({
+            tipo: 'general',
+            titulo: '📊 Datos Insuficientes',
+            descripcion: 'Necesitas más meses de datos para generar recomendaciones precisas de timing.',
+            prioridad: 'media'
+        });
+        return recomendaciones;
+    }
+    
+    // Encontrar meses con menos gastos (mejores para gastos deducibles)
+    const gastosPorMesOrdenados = meses.map(mes => ({
+        mes: mes,
+        cantidad: gastosPorMes[mes].length,
+        monto: gastosPorMes[mes].reduce((sum, g) => sum + g.cantidad, 0)
+    })).sort((a, b) => a.cantidad - b.cantidad);
+    
+    const mesesBajosGastos = gastosPorMesOrdenados.slice(0, 2);
+    const mesesAltosGastos = gastosPorMesOrdenados.slice(-2);
+    
+    // Recomendaciones específicas
+    recomendaciones.push({
+        tipo: 'timing',
+        titulo: '⏰ Timing Óptimo para Gastos Deducibles',
+        descripcion: `Los meses con menor actividad (${mesesBajosGastos.map(m => nombreMes(m.mes)).join(' y ')}) son ideales para realizar gastos educativos, médicos o de donación.`,
+        prioridad: 'alta'
+    });
+    
+    recomendaciones.push({
+        tipo: 'planificacion',
+        titulo: '📅 Planificación Anual',
+        descripcion: 'Considera concentrar gastos deducibles en el primer trimestre para maximizar beneficios fiscales en la declaración anual.',
+        prioridad: 'alta'
+    });
+    
+    return recomendaciones;
+}
+
+/**
+ * Mostrar recomendaciones de timing
+ */
+function mostrarRecomendacionesTiming(recomendaciones) {
+    const resultadoDiv = document.getElementById('resultadoTiming');
+    const detalleDiv = document.getElementById('detalleTiming');
+    
+    let html = '<div style="margin-bottom: 1rem;">';
+    html += '<p><strong>⏰ Recomendaciones de Timing Fiscal</strong></p>';
+    html += '</div>';
+    
+    html += '<div style="space-y: 1rem;">';
+    
+    recomendaciones.forEach(recomendacion => {
+        const tipoIcon = recomendacion.tipo === 'timing' ? '⏰' : '📅';
+        html += `
+            <div style="background: rgba(16, 185, 129, 0.05); padding: 1rem; border-radius: 8px; border-left: 4px solid #10B981;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #10B981;">${tipoIcon} ${recomendacion.titulo}</h4>
+                <p style="font-size: 0.9rem; color: var(--text-light);">${recomendacion.descripcion}</p>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    detalleDiv.innerHTML = html;
+    resultadoDiv.style.display = 'block';
+}
+
+/**
+ * Convertir número de mes a nombre
+ */
+function nombreMes(numeroMes) {
+    const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    return meses[numeroMes] || 'Mes desconocido';
+}
+
+/**
+ * Función de ayuda para la pestaña de optimización fiscal
+ */
+function mostrarAyudaOptimizacionFiscal() {
+    mostrarToast('💡 La optimización fiscal te ayuda a maximizar beneficios fiscales legales', 'info');
+}
+
+// ======================================================================================
+// FIN DE FUNCIONES PARA OPTIMIZACIÓN FISCAL SIMPLIFICADA
+// ======================================================================================
+
+// =============================================================
+// 💰 FUNCIONALIDAD: PRESUPUESTO SUGERIDO
+// =============================================================
+
+// Cargar categorías disponibles en un <select multiple>
+async function cargarCategoriasPresupuesto() {
+    const categorias = await getAllEntries(STORES.CATEGORIAS);
+    const select = document.getElementById('selectCategoriasPresupuesto');
+    if (!select) return;
+
+    select.innerHTML = ''; // Limpia las opciones previas
+    categorias.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    
+    categorias.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat.nombre;
+        opt.textContent = cat.nombre;
+        select.appendChild(opt);
+    });
+}
+
+const REGISTROS_POR_PAGINA = 5;
+let paginaHistorial = 1;
+
+
+// ============================================
+// 💰 PRESUPUESTO SUGERIDO — versión corregida (rango opcional + déficit)
+// ============================================
+// ============================================
+// 💰 PRESUPUESTO SUGERIDO — versión final corregida
+// ============================================
+async function calcularPresupuestoSugerido() {
+    const presupuestoInput = document.getElementById('presupuestoInicial');
+    const porcentajeInput = document.getElementById('porcentajeExtra');
+    const valorPresupuestoTexto = presupuestoInput.value.trim(); // Guardar el valor original del texto
+    const valorPresupuesto = parseNumberVE(valorPresupuestoTexto);
+    const porcentajeExtra = parseFloat(porcentajeInput.value) || 0;
+
+    if (isNaN(valorPresupuesto) || valorPresupuesto <= 0) {
+        mostrarToast('Por favor, ingresa un presupuesto inicial válido.', 'danger');
+        return;
+    }
+
+    const select = document.getElementById('selectCategoriasPresupuesto');
+    const seleccionadas = Array.from(select.selectedOptions).map(opt => opt.value);
+    if (seleccionadas.length === 0) {
+        mostrarToast('Selecciona al menos una categoría para calcular.', 'danger');
+        return;
+    }
+
+    // --- Obtener movimientos ---
+    const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+    const gastosSeleccionados = movimientos.filter(m =>
+        m.tipo === 'gasto' && seleccionadas.includes(m.categoria)
+    );
+
+    if (gastosSeleccionados.length === 0) {
+        mostrarToast('No hay gastos registrados en las categorías seleccionadas.', 'info');
+        return;
+    }
+
+    // --- Limpieza forzada de valores vacíos/autocompletados ---
+    const fDesdeEl = document.getElementById("fechaDesdePresupuesto");
+    const fHastaEl = document.getElementById("fechaHastaPresupuesto");
+    if (fDesdeEl && (!fDesdeEl.value || fDesdeEl.value.trim() === "")) fDesdeEl.value = "";
+    if (fHastaEl && (!fHastaEl.value || fHastaEl.value.trim() === "")) fHastaEl.value = "";
+
+    // --- Lectura segura de inputs de fecha ---
+    let fechaDesde = null;
+    let fechaHasta = null;
+
+    // Función auxiliar para crear fecha local desde string YYYY-MM-DD
+    function crearFechaLocal(fechaStr) {
+        const partes = fechaStr.split('-');
+        if (partes.length === 3) {
+            const año = parseInt(partes[0], 10);
+            const mes = parseInt(partes[1], 10) - 1; // Los meses en JS son 0-indexed
+            const dia = parseInt(partes[2], 10);
+            return new Date(año, mes, dia);
+        }
+        return null;
+    }
+
+    if (fDesdeEl && fDesdeEl.value && fDesdeEl.value.trim() !== "") {
+        const d = crearFechaLocal(fDesdeEl.value);
+        if (d && !isNaN(d.getTime())) {
+            fechaDesde = d;
+            fechaDesde.setHours(0, 0, 0, 0);
+        }
+    }
+
+    if (fHastaEl && fHastaEl.value && fHastaEl.value.trim() !== "") {
+        const h = crearFechaLocal(fHastaEl.value);
+        if (h && !isNaN(h.getTime())) {
+            fechaHasta = h;
+            fechaHasta.setHours(0, 0, 0, 0);
+        }
+    }
+
+    // Validar coherencia del rango
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+        mostrarToast("⚠️ La fecha 'Desde' no puede ser mayor que la fecha 'Hasta'", "danger");
+        return;
+    }
+
+    // --- Aplicar filtro de fechas solo si hay selección válida ---
+    const gastosFiltrados = gastosSeleccionados.filter(m => {
+        const fechaMov = new Date(m.fecha);
+        fechaMov.setHours(0, 0, 0, 0);
+
+        if (fechaDesde) {
+            const desde = new Date(fechaDesde);
+            desde.setHours(0, 0, 0, 0);
+            if (fechaMov < desde) return false;
+        }
+        if (fechaHasta) {
+            const hasta = new Date(fechaHasta);
+            hasta.setHours(23, 59, 59, 999);
+            if (fechaMov > hasta) return false;
+        }
+        return true;
+    });
+
+    // Si el usuario seleccionó fechas y no hay resultados → mensaje
+    if ((fechaDesde || fechaHasta) && gastosFiltrados.length === 0) {
+        mostrarToast("No hay gastos dentro del rango de fechas seleccionado.", "info");
+        return;
+    }
+
+    // --- Calcular fechas reales del período analizado ---
+    const fechas = gastosFiltrados.map(m => new Date(m.fecha));
+    let fechaInicio, fechaFin;
+
+    if (fechas.length > 0) {
+        fechaInicio = fechaDesde || new Date(Math.min(...fechas));
+        fechaFin = fechaHasta || new Date(Math.max(...fechas));
+    } else {
+        const hoy = new Date();
+        fechaInicio = hoy;
+        fechaFin = hoy;
+    }
+
+    fechaInicio.setHours(0, 0, 0, 0);
+    fechaFin.setHours(0, 0, 0, 0);
+
+    // --- Calcular total de días (inclusivo) ---
+    const msPorDia = 1000 * 60 * 60 * 24;
+    let totalDias = Math.ceil((fechaFin - fechaInicio) / msPorDia) + 1;
+    if (isNaN(totalDias) || totalDias < 1) totalDias = 1;
+
+    // --- Totales y promedios ---
+    const totalGastos = gastosFiltrados.reduce((s, m) => s + m.cantidad, 0);
+    const promedioDiario = totalGastos / totalDias;
+    const promedioMensual = promedioDiario * totalDias;     // real del período
+    const promedioMensualProyectado = promedioDiario * 30;  // normalizado a 30d
+
+    // --- Porcentaje adicional ---
+    const montoExtra = (promedioMensualProyectado * porcentajeExtra) / 100;
+    const presupuestoSugerido = promedioMensualProyectado + montoExtra;
+
+    // --- Restante / Déficit ---
+    const restante = valorPresupuesto - presupuestoSugerido;
+
+    // --- Función auxiliar para formatear fecha local (sin conversión UTC) ---
+    function formatearFechaLocal(fecha) {
+        const año = fecha.getFullYear();
+        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        const dia = String(fecha.getDate()).padStart(2, '0');
+        return `${dia}/${mes}/${año}`;
+    }
+
+    // --- Texto de fechas para mostrar (usando formato local) ---
+    const periodoDesdeStr = formatearFechaLocal(fechaDesde || fechaInicio);
+    const periodoHastaStr = formatearFechaLocal(fechaHasta || fechaFin);
+
+    // --- Limpiar los campos de fecha después de calcular ---
+    const fDesde = document.getElementById('fechaDesdePresupuesto');
+    const fHasta = document.getElementById('fechaHastaPresupuesto');
+    if (fDesde) fDesde.value = '';
+    if (fHasta) fHasta.value = '';
+
+    // --- Mostrar resultados ---
+    const resultado = document.getElementById('resultadoPresupuesto');
+    if (resultado) {
+        resultado.innerHTML = `
+            <p><strong>Período analizado:</strong> ${periodoDesdeStr} → ${periodoHastaStr}</p>
+            <p><strong>Total de días (inclusivo):</strong> ${totalDias} días</p>
+            <p><strong>Total de gastos:</strong> Bs. ${formatNumberVE(totalGastos)}</p>
+            <p><strong>Promedio diario:</strong> Bs. ${formatNumberVE(promedioDiario)}</p>
+            <p><strong>Promedio mensual (según rango):</strong> Bs. ${formatNumberVE(promedioMensual)}</p>
+            <p><strong>Promedio mensual proyectado (30d):</strong> Bs. ${formatNumberVE(promedioMensualProyectado)}</p>
+            <p><strong>Porcentaje adicional:</strong> ${porcentajeExtra}% (Bs. ${formatNumberVE(montoExtra)})</p>
+            <p><strong>Presupuesto sugerido final:</strong> Bs. ${formatNumberVE(presupuestoSugerido)}</p>
+            <p><strong>Presupuesto inicial:</strong> Bs. ${formatNumberVE(valorPresupuesto)}</p>
+            ${restante >= 0 
+              ? `<p><strong>Restante disponible:</strong> Bs. ${formatNumberVE(restante)}</p>`
+              : `<p><strong>Déficit presupuestario:</strong> Bs. ${formatNumberVE(Math.abs(restante))}</p>`}
+            <p style="margin-top:1rem; color:${restante >= 0 ? 'var(--success)' : 'var(--danger)'};">
+              ${restante >= 0 
+                ? '✅ Tienes margen para otros gastos o ahorro.' 
+                : '⚠️ Tu presupuesto no cubre los gastos promedio. Considera ajustar tus metas o reducir gastos.'}
+            </p>
+        `;
+    }
+
+    // --- Barra de progreso ---
+    const contenedorBarra = document.getElementById('barraPresupuestoContainer');
+    if (contenedorBarra) {
+        const porcentajeUsado = (presupuestoSugerido / valorPresupuesto) * 100;
+        const porcentajeTexto = porcentajeUsado.toFixed(1);
+
+        let color = '#4caf50'; // verde
+        if (porcentajeUsado >= 80 && porcentajeUsado < 100) color = '#ffc107'; // amarillo
+        if (porcentajeUsado >= 100) color = '#f44336'; // rojo
+
+        contenedorBarra.innerHTML = `
+            <div class="barra-presupuesto">
+                <div class="barra-uso" style="width:${Math.min(porcentajeUsado, 100)}%; background-color:${color};"></div>
+            </div>
+            <div class="barra-label">Presupuesto usado: ${porcentajeTexto}%</div>
+        `;
+    }
+
+    // --- Guardar datos ---
+    const datosNormalizados = {
+        version: '2.3',
+        fecha: new Date().toISOString(),
+        categorias: Array.isArray(seleccionadas) ? seleccionadas : [],
+        fechaInicio: fechaInicio.toISOString(),
+        fechaFin: fechaFin.toISOString(),
+        totalDias: Number(totalDias) || 0,
+        totalGastos: Number(totalGastos) || 0,
+        promedioDiario: Number(promedioDiario) || 0,
+        promedioMensual: Number(promedioMensual) || 0,
+        porcentajeExtra: Number(porcentajeExtra) || 0,
+        montoExtra: Number(montoExtra) || 0,
+        presupuestoSugerido: Number(presupuestoSugerido) || 0,
+        presupuestoInicial: Number(valorPresupuesto) || 0,
+        presupuestoInicialTexto: valorPresupuestoTexto || '', // Guardar el valor original del texto
+        restante: Number(restante) || 0
+    };
+
+    localStorage.setItem('presupuestoSugeridoActual', JSON.stringify(datosNormalizados));
+    mostrarToast('💾 Presupuesto sugerido calculado correctamente.', 'success');
+    mostrarHistorialPresupuestos();
+}
+
+
+// ✅ Cargar configuración guardada al abrir la pestaña
+// ✅ Restaurar cálculo guardado y reconstruir la UI completa (incluye barra)
+function cargarPresupuestoSugeridoGuardado() {
+    const guardadoRaw = localStorage.getItem('presupuestoSugeridoActual');
+    if (!guardadoRaw) return;
+
+    let datos;
+    try {
+        datos = JSON.parse(guardadoRaw);
+    } catch (e) {
+        console.error('Error parseando presupuestoSugeridoActual:', e);
+        return;
+    }
+
+    // Aceptar varias formas de los datos (compatibilidad hacia atrás)
+    // Campos esperados posibles:
+    // - presupuestoInicial o presupuestoInicial (nombres usados antes/ahora)
+    // - totalGastos o totalGastos
+    // - promedioGastos OR promedioMensual / promedioDiario
+    // - porcentajeExtra, montoExtra, presupuestoSugerido, restante, fechaInicio/fechaFin (ISO)
+    const presupuestoInicial = (datos.presupuestoInicial ?? datos.presupuestoBase ?? datos.presupuesto) || 0;
+    const totalGastos = datos.totalGastos ?? datos.total_gastos ?? 0;
+    const promedioDiario = datos.promedioDiario ?? datos.promedio_diario ?? null;
+    const promedioMensual = datos.promedioMensual ?? datos.promedio_mensual ?? datos.promedioMensual ?? null;
+    const porcentajeExtra = datos.porcentajeExtra ?? datos.porcentaje ?? 0;
+    const montoExtra = datos.montoExtra ?? datos.extra ?? 0;
+    const presupuestoSugerido = datos.presupuestoSugerido ?? datos.sugerido ?? 0;
+    const restante = datos.restante ?? (presupuestoInicial - presupuestoSugerido);
+    const fechaInicioISO = datos.fechaInicio ?? datos.fecha_inicio ?? datos.fechaDesde ?? null;
+    const fechaFinISO = datos.fechaFin ?? datos.fecha_fin ?? datos.fechaHasta ?? null;
+    const totalDias = datos.totalDias ?? datos.dias ?? null;
+
+    // Restaurar inputs (si existen)
+    const inputPresupuesto = document.getElementById('presupuestoInicial');
+    if (inputPresupuesto) {
+        // NO restaurar el valor automáticamente - dejar campo vacío para nuevo ingreso
+        inputPresupuesto.value = '';
+    }
+    const inputPorcentaje = document.getElementById('porcentajeExtra');
+    if (inputPorcentaje) {
+        inputPorcentaje.value = porcentajeExtra ?? inputPorcentaje.value ?? 0;
+    }
+
+    // Restaurar selección de categorías (si existen)
+    const select = document.getElementById('selectCategoriasPresupuesto');
+    if (select && Array.isArray(datos.categorias)) {
+        Array.from(select.options).forEach(opt => {
+            opt.selected = datos.categorias.includes(opt.value);
+        });
+    }
+
+    // Normalizar fechas si vienen en ISO
+    let fechaInicioText = '';
+    let fechaFinText = '';
+    if (fechaInicioISO) {
+        try {
+            const d = new Date(fechaInicioISO);
+            if (!isNaN(d)) fechaInicioText = d.toLocaleDateString('es-VE');
+        } catch (e) { /* ignore */ }
+    }
+    if (fechaFinISO) {
+        try {
+            const d2 = new Date(fechaFinISO);
+            if (!isNaN(d2)) fechaFinText = d2.toLocaleDateString('es-VE');
+        } catch (e) { /* ignore */ }
+    }
+
+    // Si no viene fechaFin en los datos, asumimos hoy
+    if (!fechaFinText) {
+        fechaFinText = new Date().toLocaleDateString('es-VE');
+    }
+
+    // Decidir qué promedio mostrar: preferir promedio diario + mensual si están disponibles
+    let promedioDiarioShow = promedioDiario;
+    let promedioMensualShow = promedioMensual;
+    if (!promedioMensualShow && promedioDiarioShow) promedioMensualShow = promedioDiarioShow * 30;
+    if (!promedioDiarioShow && promedioMensualShow) promedioDiarioShow = promedioMensualShow / 30;
+
+    // Renderizar el bloque de resultado completo
+    const resultado = document.getElementById('resultadoPresupuesto');
+    if (resultado) {
+        resultado.innerHTML = `
+            ${fechaInicioText ? `<p><strong>Período analizado:</strong> ${fechaInicioText} → ${fechaFinText}</p>` : ''}
+            ${totalDias ? `<p><strong>Total de días (inclusivo):</strong> ${totalDias} días</p>` : ''}
+            <p><strong>Total de gastos:</strong> Bs. ${formatNumberVE(Number(totalGastos) || 0)}</p>
+            ${promedioDiarioShow !== null ? `<p><strong>Promedio diario:</strong> Bs. ${formatNumberVE(promedioDiarioShow)}</p>` : ''}
+            ${promedioMensualShow !== null ? `<p><strong>Promedio mensual proyectado (30d):</strong> Bs. ${formatNumberVE(promedioMensualShow)}</p>` : ''}
+            <p><strong>Porcentaje adicional:</strong> ${porcentajeExtra}% (Bs. ${formatNumberVE(Number(montoExtra) || 0)})</p>
+            <p><strong>Presupuesto sugerido final:</strong> Bs. ${formatNumberVE(Number(presupuestoSugerido) || 0)}</p>
+            <p><strong>Presupuesto inicial:</strong> Bs. ${formatNumberVE(Number(presupuestoInicial) || 0)}</p>
+            <p><strong>Restante disponible:</strong> Bs. ${formatNumberVE(Number(restante) || 0)}</p>
+        `;
+    }
+
+    // Volver a dibujar la barra de progreso usando la misma lógica que en el cálculo
+    renderizarBarraPresupuesto(Number(presupuestoSugerido) || 0, Number(presupuestoInicial) || 0);
+
+    // Actualizar historial UI por si no está cargado
+    mostrarHistorialPresupuestos();
+}
+
+// ✅ Helper para dibujar la barra de progreso (reempleza la lógica embebida)
+function renderizarBarraPresupuesto(presupuestoSugerido, presupuestoInicial) {
+    const contenedorBarra = document.getElementById('barraPresupuestoContainer');
+    if (!contenedorBarra) return;
+
+    // Evitar división por cero
+    const valorInicial = (typeof presupuestoInicial === 'number' && !isNaN(presupuestoInicial) && presupuestoInicial > 0)
+        ? presupuestoInicial
+        : 1;
+
+    const porcentajeUsado = (presupuestoSugerido / valorInicial) * 100;
+    const porcentajeTexto = isFinite(porcentajeUsado) ? porcentajeUsado.toFixed(1) : '0.0';
+
+    let color = '#4caf50'; // verde
+    if (porcentajeUsado >= 80 && porcentajeUsado < 100) color = '#ffc107'; // amarillo
+    if (porcentajeUsado >= 100) color = '#f44336'; // rojo
+
+    contenedorBarra.innerHTML = `
+        <div class="barra-presupuesto">
+            <div class="barra-uso" style="width:${Math.min(Math.max(porcentajeUsado, 0), 100)}%; background-color:${color};"></div>
+        </div>
+        <div class="barra-label">Presupuesto usado: ${porcentajeTexto}%</div>
+    `;
+}
+
+
+// ✅ Guardar actual en historial
+// Reemplazo seguro: guardarPresupuestoEnHistorial que usa IndexedDB
+async function guardarPresupuestoEnHistorial() {
+  try {
+    const contResultado = document.getElementById('resultadoPresupuesto');
+    if (!contResultado) {
+      mostrarToast('No hay resultados de presupuesto para guardar.', 'warning');
+      return;
+    }
+
+    const texto = contResultado.innerText || '';
+    if (!texto.includes('Período analizado')) {
+      mostrarToast('No se detectó un cálculo reciente para guardar.', 'warning');
+      return;
+    }
+
+    const ahora = Date.now();
+    const presupuestoInicialInput = document.getElementById('presupuestoInicial');
+    const valorInicial = presupuestoInicialInput?.value || '0';
+    
+    // Obtener las categorías del cálculo guardado (prioridad) o del select
+    let categorias = [];
+    try {
+      // Primero intentar obtener del cálculo guardado (más confiable)
+      const calculoActual = localStorage.getItem('presupuestoSugeridoActual');
+      if (calculoActual) {
+        const datos = JSON.parse(calculoActual);
+        if (datos.categorias && Array.isArray(datos.categorias) && datos.categorias.length > 0) {
+          categorias = datos.categorias;
+        }
+      }
+      
+      // Si no hay categorías en el cálculo guardado, intentar del select
+      if (categorias.length === 0) {
+        const select = document.getElementById('selectCategoriasPresupuesto');
+        if (select) {
+          categorias = Array.from(select.selectedOptions).map(opt => opt.value);
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudieron obtener las categorías:', e);
+    }
+    
+    const nuevoRegistro = {
+      textoResumen: texto.trim(),
+      presupuestoInicial: valorInicial.trim(),
+      categorias: categorias // Guardar las categorías
+    };
+
+    // Comprobación: duplicado o demasiado pronto
+    if (ultimoGuardado) {
+      const { timestamp, datos } = ultimoGuardado;
+      const tiempoTranscurrido = (ahora - timestamp) / 1000;
+
+      // Comparar texto y presupuesto inicial (mismo cálculo)
+      if (
+        datos.textoResumen === nuevoRegistro.textoResumen &&
+        datos.presupuestoInicial === nuevoRegistro.presupuestoInicial
+      ) {
+        mostrarToast('⚠️ Este mismo cálculo ya fue guardado.', 'warning');
+        return;
+      }
+
+      // Evitar guardar antes de 30 s
+      if (tiempoTranscurrido < 30) {
+        const faltan = Math.ceil(30 - tiempoTranscurrido);
+        mostrarToast(`⏳ Espera ${faltan}s antes de guardar otro presupuesto.`, 'info');
+        return;
+      }
+    }
+
+    // Actualizar marca de tiempo y datos
+    ultimoGuardado = { timestamp: ahora, datos: nuevoRegistro };
+
+    // Guardar registro
+    const registro = {
+      fecha: new Date().toISOString(),
+      ...nuevoRegistro
+    };
+    const historial = JSON.parse(localStorage.getItem('historialPresupuestos') || '[]');
+    historial.push(registro);
+    localStorage.setItem('historialPresupuestos', JSON.stringify(historial));
+
+    mostrarToast('📘 Presupuesto guardado en historial.', 'success');
+    mostrarHistorialPresupuestos();
+  } catch (err) {
+    console.error('Error guardando presupuesto:', err);
+    mostrarToast('❌ Error al guardar el presupuesto.', 'danger');
+  }
+}
+
+
+
+// ✅ Eliminar un presupuesto individual del historial
+function eliminarPresupuestoIndividual(indice) {
+    const historialRaw = localStorage.getItem('historialPresupuestos');
+    if (!historialRaw) {
+        mostrarToast('No hay historial disponible.', 'info');
+        return;
+    }
+
+    let historial;
+    try {
+        historial = JSON.parse(historialRaw);
+    } catch (e) {
+        console.error('Error al parsear el historial:', e);
+        mostrarToast('Error al cargar el historial.', 'danger');
+        return;
+    }
+
+    if (!historial || historial.length === 0 || indice < 0 || indice >= historial.length) {
+        mostrarToast('El cálculo seleccionado no existe.', 'warning');
+        return;
+    }
+
+    // Confirmar eliminación
+    if (!confirm('¿Seguro que deseas eliminar este cálculo del historial?')) {
+        return;
+    }
+
+    // Eliminar el elemento del array
+    historial.splice(indice, 1);
+
+    // Guardar el historial actualizado
+    localStorage.setItem('historialPresupuestos', JSON.stringify(historial));
+    
+    mostrarToast('🗑️ Cálculo eliminado del historial.', 'success');
+    
+    // Ajustar la página actual si es necesario
+    const totalPaginas = Math.ceil(historial.length / REGISTROS_POR_PAGINA);
+    if (paginaHistorial > totalPaginas && totalPaginas > 0) {
+        paginaHistorial = totalPaginas;
+    }
+    
+    // Actualizar la visualización
+    mostrarHistorialPresupuestos();
+}
+
+// ✅ Eliminar todo el historial
+function eliminarHistorialPresupuestos() {
+    if (!confirm('¿Seguro que deseas eliminar todo el historial de presupuestos?')) return;
+    localStorage.removeItem('historialPresupuestos');
+    mostrarToast('🗑️ Historial eliminado.', 'info');
+    mostrarHistorialPresupuestos();
+}
+
+function mostrarHistorialPresupuestos() {
+    const contenedor = document.getElementById('historialPresupuestos');
+    if (!contenedor) return;
+
+    const historial = JSON.parse(localStorage.getItem('historialPresupuestos') || '[]');
+    contenedor.innerHTML = '';
+
+    if (historial.length === 0) {
+        contenedor.innerHTML = '<li style="color:var(--text-light);">No hay presupuestos archivados aún.</li>';
+        const pagEl = document.getElementById('paginaActual');
+        if (pagEl) pagEl.textContent = '—';
+        return;
+    }
+
+    const totalPaginas = Math.ceil(historial.length / REGISTROS_POR_PAGINA);
+    if (paginaHistorial > totalPaginas) paginaHistorial = totalPaginas;
+
+    // Mostrar en orden cronológico (más antiguos primero, más recientes al final)
+    const inicio = (paginaHistorial - 1) * REGISTROS_POR_PAGINA;
+    const fin = inicio + REGISTROS_POR_PAGINA;
+    const pagina = historial.slice(inicio, fin);
+
+    pagina.forEach((item, indexPagina) => {
+        const fecha = new Date(item.fecha).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' });
+        const li = document.createElement('li');
+        
+        // Calcular el índice real en el historial completo
+        const itemIndex = inicio + indexPagina;
+
+        // --- NUEVO: si existe un resumen de texto (nuevo formato), lo mostramos tal cual ---
+        if (item.textoResumen) {
+            const categoriasTexto = (item.categorias && Array.isArray(item.categorias) && item.categorias.length > 0) 
+                ? item.categorias.join(', ') 
+                : '—';
+            
+            li.innerHTML = `
+                <div style="padding:0.5rem; border:1px solid #ddd; border-radius:8px; margin-bottom:0.5rem; background:#fafafa;">
+                    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:0.5rem;">
+                        <div>
+                            <strong>${fecha}</strong><br>
+                            <small style="color:var(--text-light);">Categorías: ${categoriasTexto}</small>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button onclick="imprimirPresupuestoIndividual(${itemIndex})" 
+                                    style="background:var(--primary); color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer; font-size:0.85rem;"
+                                    title="Imprimir este cálculo">
+                                🖨️ Imprimir
+                            </button>
+                            <button onclick="eliminarPresupuestoIndividual(${itemIndex})" 
+                                    style="background:var(--danger); color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer; font-size:0.85rem;"
+                                    title="Eliminar este cálculo">
+                                🗑️ Eliminar
+                            </button>
+                        </div>
+                    </div>
+                    <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${item.textoResumen}</pre>
+                </div>
+            `;
+        } else {
+            // --- COMPATIBILIDAD: registros antiguos ---
+            const categorias = item.categorias?.join(', ') || '—';
+            const total = item.totalGastos ?? 0;
+            const promedio = item.promedioGastos ?? item.promedioDiario ?? 0;
+            const inicial = item.presupuestoInicial ?? 0;
+            const sugerido = item.presupuestoParaGastos ?? item.presupuestoSugerido ?? 0;
+            const restante = item.restante ?? (inicial - sugerido);
+
+            li.innerHTML = `
+                <div style="padding:0.5rem; border:1px solid #ddd; border-radius:8px; margin-bottom:0.5rem; background:#fafafa;">
+                    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:0.5rem;">
+                        <div>
+                            <strong>${fecha}</strong><br>
+                            Categorías: ${categorias}<br>
+                            Total: Bs. ${formatNumberVE(total)}<br>
+                            Promedio: Bs. ${formatNumberVE(promedio)}<br>
+                            Inicial: Bs. ${formatNumberVE(inicial)}<br>
+                            Sugerido: Bs. ${formatNumberVE(sugerido)}<br>
+                            Restante: Bs. ${formatNumberVE(restante)}
+                        </div>
+                        <button onclick="eliminarPresupuestoIndividual(${itemIndex})" 
+                                style="background:var(--danger); color:white; border:none; border-radius:6px; padding:0.4rem 0.8rem; cursor:pointer; font-size:0.85rem;"
+                                title="Eliminar este cálculo">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        contenedor.appendChild(li);
+    });
+
+    const pagEl = document.getElementById('paginaActual');
+    if (pagEl) pagEl.textContent = `${paginaHistorial} / ${totalPaginas}`;
+}
+
+
+// ✅ Cambiar página
+function cambiarPaginaHistorial(direccion) {
+    const historial = JSON.parse(localStorage.getItem('historialPresupuestos') || '[]');
+    const totalPaginas = Math.ceil(historial.length / REGISTROS_POR_PAGINA);
+    paginaHistorial += direccion;
+    if (paginaHistorial < 1) paginaHistorial = 1;
+    if (paginaHistorial > totalPaginas) paginaHistorial = totalPaginas;
+    mostrarHistorialPresupuestos();
+}
+
+// ✅ Reiniciar pestaña de Presupuesto Sugerido
+function reiniciarPresupuestoSugerido() {
+    // Limpiar localStorage del cálculo actual (sin borrar historial)
+    localStorage.removeItem('presupuestoSugeridoActual');
+
+    // Limpiar campos de entrada
+    const inputPresupuesto = document.getElementById('presupuestoInicial');
+    const inputPorcentaje = document.getElementById('porcentajeExtra');
+    if (inputPresupuesto) inputPresupuesto.value = '';
+    if (inputPorcentaje) inputPorcentaje.value = '';
+
+    // Limpiar selección de categorías
+    const select = document.getElementById('selectCategoriasPresupuesto');
+    if (select) {
+        Array.from(select.options).forEach(opt => (opt.selected = false));
+    }
+
+    // Limpiar resultados y barra
+    const resultado = document.getElementById('resultadoPresupuesto');
+    if (resultado) resultado.innerHTML = '';
+
+    const contenedorBarra = document.getElementById('barraPresupuestoContainer');
+    if (contenedorBarra) contenedorBarra.innerHTML = '';
+
+    mostrarToast('🔄 Presupuesto reiniciado. Puedes hacer un nuevo cálculo.', 'info');
+}
+
+
+// ✅ Plegar o desplegar historial
+function toggleHistorial() {
+    const wrapper = document.getElementById('historialWrapper');
+    const btn = document.getElementById('btnToggleHistorial');
+    const visible = wrapper.style.display !== 'none';
+    wrapper.style.display = visible ? 'none' : 'block';
+    btn.textContent = visible ? '⬇️ Mostrar' : '⬆️ Ocultar';
+}
+
+// ✅ Exportar reporte del historial en PDF
+async function exportarReportePresupuestos() {
+    const historial = JSON.parse(localStorage.getItem('historialPresupuestos') || '[]');
+    if (historial.length === 0) {
+        mostrarToast('No hay datos en el historial para exportar.', 'danger');
+        return;
+    }
+
+    // Importa jsPDF dinámicamente si no está cargado
+    if (typeof window.jspdf === 'undefined') {
+        await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+    const { jsPDF } = window.jspdf;
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const margen = 40;
+    const ancho = doc.internal.pageSize.getWidth();
+    const ahora = new Date();
+    const fechaStr = ahora.toLocaleString('es-VE', { dateStyle: 'full', timeStyle: 'short' });
+
+    // 🔹 Encabezado
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('Reporte de Presupuestos Sugeridos', ancho / 2, 60, { align: 'center' });
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generado el ${fechaStr}`, ancho / 2, 80, { align: 'center' });
+
+    // 🔹 Línea divisoria
+    doc.setDrawColor(150);
+    doc.line(margen, 90, ancho - margen, 90);
+
+    // 🔹 Tabla de datos
+    let y = 120;
+    let totalGeneral = 0, totalRestante = 0, totalPromedio = 0;
+
+    historial.forEach((item, i) => {
+        const fecha = new Date(item.fecha).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(`Registro ${i + 1}`, margen, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        y += 15;
+        doc.text(`Fecha: ${fecha}`, margen, y);
+        y += 12;
+        doc.text(`Categorías: ${item.categorias.join(', ')}`, margen, y);
+        y += 12;
+        doc.text(`Inicial: Bs. ${formatNumberVE(item.presupuestoInicial)}`, margen, y);
+        y += 12;
+        doc.text(`Total gastos: Bs. ${formatNumberVE(item.totalGastos)}`, margen, y);
+        y += 12;
+        doc.text(`Promedio: Bs. ${formatNumberVE(item.promedioGastos)}`, margen, y);
+        y += 12;
+        doc.text(`Sugerido: Bs. ${formatNumberVE(item.presupuestoParaGastos)}`, margen, y);
+        y += 12;
+        doc.text(`Restante: Bs. ${formatNumberVE(item.restante)}`, margen, y);
+        y += 18;
+        doc.setDrawColor(230);
+        doc.line(margen, y, ancho - margen, y);
+        y += 15;
+
+        // Suma para resumen
+        totalGeneral += item.presupuestoParaGastos;
+        totalRestante += item.restante;
+        totalPromedio += item.promedioGastos;
+
+        // Si nos pasamos del largo de página, crear nueva
+        if (y > 740 && i < historial.length - 1) {
+            doc.addPage();
+            y = 60;
+        }
+    });
+
+    // 🔹 Resumen final
+    const promedioPromedio = totalPromedio / historial.length;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Resumen General', margen, y);
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Presupuestos totales: ${historial.length}`, margen, y); y += 14;
+    doc.text(`Suma total sugerida: Bs. ${formatNumberVE(totalGeneral)}`, margen, y); y += 14;
+    doc.text(`Promedio de promedios: Bs. ${formatNumberVE(promedioPromedio)}`, margen, y); y += 14;
+    doc.text(`Total restante acumulado: Bs. ${formatNumberVE(totalRestante)}`, margen, y);
+
+    // 🔹 Pie de página
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text(`© ${new Date().getFullYear()} — Sistema Financiero`, ancho / 2, 820, { align: 'center' });
+
+    // 🔹 Descargar
+    const nombreArchivo = `Reporte_Presupuestos_${ahora.getFullYear()}${(ahora.getMonth() + 1)
+        .toString().padStart(2, '0')}${ahora.getDate().toString().padStart(2, '0')}.pdf`;
+    doc.save(nombreArchivo);
+
+    mostrarToast('📤 Reporte exportado correctamente.', 'success');
+}
+
+// =========================================================
+// ⏰ SISTEMA DE RECORDATORIOS con anticipación configurable
+// =========================================================
+const STORES_RECORDATORIOS = {
+  RECORDATORIOS: 'recordatorios'
+};
+
+/* ---------- CRUD ---------- */
+async function addRecordatorio(rec) {
+  return addEntry(STORES_RECORDATORIOS.RECORDATORIOS, rec);
+}
+async function getAllRecordatorios() {
+  return getAllEntries(STORES_RECORDATORIOS.RECORDATORIOS);
+}
+async function updateRecordatorio(rec) {
+  return updateEntry(STORES_RECORDATORIOS.RECORDATORIOS, rec);
+}
+async function deleteRecordatorio(id) {
+  return deleteEntry(STORES_RECORDATORIOS.RECORDATORIOS, id);
+}
+
+/* ---------- Guardar desde form ---------- */
+async function guardarRecordatorio() {
+  const titulo = document.getElementById('tituloRecordatorio').value.trim();
+  const descripcion = document.getElementById('descripcionRecordatorio').value.trim();
+  const fecha = document.getElementById('fechaRecordatorio').value; // 'YYYY-MM-DD'
+  const dias = parseInt(document.getElementById('diasAnticipacion').value) || 5;
+  const repetirMismoDia = document.getElementById('repetirMismoDia').checked;
+  const intervaloMinutos = repetirMismoDia ? parseInt(document.getElementById('intervaloMinutos').value) || 30 : null;
+
+  if (!titulo || !fecha) {
+    mostrarToast('❌ Título y fecha son obligatorios', 'danger');
+    return;
+  }
+  if (new Date(fecha + 'T12:00:00') <= new Date()) { // validar usando T12 para evitar shift timezone
+    mostrarToast('❌ La fecha debe ser futura', 'danger');
+    return;
+  }
+  if (repetirMismoDia && (!intervaloMinutos || intervaloMinutos < 1)) {
+    mostrarToast('❌ El intervalo de minutos debe ser mayor a 0', 'danger');
+    return;
+  }
+
+  const rec = {
+    titulo,
+    descripcion,
+    fechaLimite: fecha,            // mantenemos 'YYYY-MM-DD' (más simple para inputs)
+    diasAnticipacion: dias,
+    avisado: false,
+    repetirMismoDia: repetirMismoDia || false,
+    intervaloMinutos: intervaloMinutos || null,
+    ultimoAvisoMismoDia: null  // Timestamp del último aviso en el mismo día
+  };
+
+  if (idRecordatorioEditando) {
+    // actualizar: preservar fechaCreacion si existe
+    const todos = await getAllRecordatorios();
+    const original = todos.find(r => r.id === idRecordatorioEditando) || {};
+    rec.id = idRecordatorioEditando;
+    rec.fechaCreacion = original.fechaCreacion || new Date().toISOString();
+    // Preservar ultimoAvisoMismoDia si existe
+    if (original.ultimoAvisoMismoDia) {
+      rec.ultimoAvisoMismoDia = original.ultimoAvisoMismoDia;
+    }
+    await updateRecordatorio(rec);
+    idRecordatorioEditando = null;
+    mostrarToast('✅ Recordatorio actualizado', 'success');
+
+    // Restaurar texto del botón (opcional)
+    const btn = document.querySelector('#side-recordatorios button[onclick="guardarRecordatorio()"]');
+    if (btn) btn.textContent = 'Guardar';
+  } else {
+    rec.fechaCreacion = new Date().toISOString();
+    await addRecordatorio(rec);
+    mostrarToast('✅ Recordatorio guardado', 'success');
+  }
+
+  limpiarFormRecordatorio();
+  await renderizarRecordatorios();
+  await renderizarProximosAvisos();
+}
+
+
+function limpiarFormRecordatorio() {
+  document.getElementById('tituloRecordatorio').value = '';
+  document.getElementById('descripcionRecordatorio').value = '';
+  document.getElementById('fechaRecordatorio').value = '';
+  document.getElementById('diasAnticipacion').value = localStorage.getItem('defaultAnticipacion') || 5;
+  document.getElementById('repetirMismoDia').checked = false;
+  document.getElementById('intervaloMinutos').value = 30;
+  document.getElementById('intervaloRepeticionContainer').style.display = 'none';
+}
+
+/* ---------- Renderizado ---------- */
+async function renderizarRecordatorios() {
+  const lista = document.getElementById('listaRecordatorios');
+  const todos = await getAllRecordatorios();
+
+  if (!todos.length) {
+    lista.innerHTML = '<p style="text-align:center;color:var(--text-light);font-style:italic;">No hay recordatorios aún.</p>';
+    return;
+  }
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  let html = '';
+  todos.forEach(r => {
+    const fLim = new Date(r.fechaLimite + 'T00:00:00');
+    fLim.setHours(0, 0, 0, 0);
+
+    // 🔧 Cálculo exacto de días restantes
+    const diasRest = Math.floor((fLim - hoy) / (1000 * 60 * 60 * 24));
+
+    // Si ya pasó, lo mostramos como “Vencido” o “HOY”
+    let textoDias = '';
+    if (diasRest < 0) textoDias = '✅ Cumplido';
+    else if (diasRest === 0) textoDias = '¡HOY!';
+    else textoDias = `en ${diasRest} día${diasRest !== 1 ? 's' : ''}`;
+
+    const clase = diasRest <= r.diasAnticipacion && diasRest >= 0 ? 'proximo' : '';
+
+    html += `
+      <div class="tarjeta-recordatorio ${clase}" 
+           style="background:var(--card-bg);border-radius:8px;padding:1rem;margin-bottom:0.75rem;
+           border-left:4px solid ${clase ? 'var(--warning)' : 'var(--primary)'};">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div>
+            <strong>${r.titulo}</strong>
+            ${r.descripcion ? `<br><small style="color:var(--text-light);">${r.descripcion}</small>` : ''}
+            <br><small style="color:var(--text-light);">
+              📅 ${fLim.toLocaleDateString('es-VE')} · ⏰ ${textoDias} 
+              (${r.diasAnticipacion} días de anticipación)
+              ${r.repetirMismoDia && r.intervaloMinutos ? ` · 🔁 Repite cada ${r.intervaloMinutos} min` : ''}
+            </small>
+          </div>
+          <div style="display:flex;gap:0.25rem;">
+            <button onclick="editarRecordatorio(${r.id})" title="Editar">✏️</button>
+            <button onclick="eliminarRecordatorio(${r.id})" title="Eliminar">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+  });
+
+  lista.innerHTML = html;
+}
+
+/* ---------- Editar ---------- */
+async function editarRecordatorio(id) {
+  const todos = await getAllRecordatorios();
+  const rec = todos.find(r => r.id === id);
+  if (!rec) return;
+
+  document.getElementById('tituloRecordatorio').value = rec.titulo;
+  document.getElementById('descripcionRecordatorio').value = rec.descripcion || '';
+
+  // Si guardaste la fecha como ISO completa (p.ej "2025-10-23T..."), tomar solo la parte de fecha
+  const fechaVal = (rec.fechaLimite && rec.fechaLimite.includes('T')) ? rec.fechaLimite.split('T')[0] : rec.fechaLimite;
+  document.getElementById('fechaRecordatorio').value = fechaVal;
+
+  document.getElementById('diasAnticipacion').value = rec.diasAnticipacion || localStorage.getItem('defaultAnticipacion') || 5;
+  
+  // Cargar configuración de repetición en el mismo día
+  const repetirMismoDia = rec.repetirMismoDia || false;
+  document.getElementById('repetirMismoDia').checked = repetirMismoDia;
+  if (repetirMismoDia) {
+    document.getElementById('intervaloRepeticionContainer').style.display = 'block';
+    document.getElementById('intervaloMinutos').value = rec.intervaloMinutos || 30;
+  } else {
+    document.getElementById('intervaloRepeticionContainer').style.display = 'none';
+  }
+
+  // marcar que estamos editando ese id
+  idRecordatorioEditando = id;
+
+  // (opcional) cambiar texto del botón para feedback
+  const btn = document.querySelector('#side-recordatorios button[onclick="guardarRecordatorio()"]');
+  if (btn) btn.textContent = 'Actualizar';
+
+  // Scroll al formulario
+  document.querySelector('#side-recordatorios section').scrollIntoView({behavior: 'smooth'});
+}
+
+/* ---------- Eliminar ---------- */
+async function eliminarRecordatorio(id) {
+  if (await mostrarConfirmacion('¿Eliminar este recordatorio?')) {
+    await deleteRecordatorio(id);
+    mostrarToast('🗑️ Recordatorio eliminado', 'info');
+    await renderizarRecordatorios();
+    await renderizarProximosAvisos();
+  }
+}
+
+/* ---------- Mostrar próximos avisos ---------- */
+async function renderizarProximosAvisos() {
+  const ul = document.getElementById('ulProximosAvisos');
+  const todos = await getAllRecordatorios();
+
+  // 🔧 Normalizamos la fecha de hoy a medianoche (sin horas)
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const proximos = [];
+  const modoAviso = localStorage.getItem('modoAvisoDiario') || 'unico';
+
+  for (const r of todos) {
+    // Igual: fecha límite normalizada
+    const fLim = new Date(r.fechaLimite + 'T00:00:00');
+    fLim.setHours(0, 0, 0, 0);
+
+    // 🔧 CORRECCIÓN: usar Math.floor consistentemente
+    const dias = Math.floor((fLim - hoy) / (1000 * 60 * 60 * 24));
+
+    // condición de aviso
+    const dentroRango = dias <= r.diasAnticipacion && dias >= 0;
+    
+    // Si está dentro del rango y tiene repetición configurada, verificar intervalo
+    let puedeAvisar = false;
+    if (dentroRango && r.repetirMismoDia && r.intervaloMinutos) {
+      const ahora = new Date();
+      const ahoraMs = ahora.getTime();
+      let ultimoAviso = 0;
+      
+      // Verificar si el último aviso fue del mismo día
+      if (r.ultimoAvisoMismoDia) {
+        const fechaUltimoAviso = new Date(r.ultimoAvisoMismoDia);
+        const fechaUltimoAvisoNormalizada = new Date(fechaUltimoAviso.getFullYear(), fechaUltimoAviso.getMonth(), fechaUltimoAviso.getDate());
+        const hoyNormalizado = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        
+        // Solo usar el último aviso si es del mismo día
+        if (fechaUltimoAvisoNormalizada.getTime() === hoyNormalizado.getTime()) {
+          ultimoAviso = fechaUltimoAviso.getTime();
+        } else {
+          // Resetear si es de otro día
+          r.ultimoAvisoMismoDia = null;
+          await updateRecordatorio(r);
+        }
+      }
+      
+      const intervaloMs = r.intervaloMinutos * 60 * 1000;
+      const tiempoDesdeUltimoAviso = ahoraMs - ultimoAviso;
+      
+      // Si nunca se ha avisado hoy o ha pasado el intervalo
+      if (ultimoAviso === 0 || tiempoDesdeUltimoAviso >= intervaloMs) {
+        puedeAvisar = true;
+      }
+    } else if (dentroRango) {
+      // Lógica normal para días anteriores (sin repetición por minutos)
+      puedeAvisar = modoAviso === 'repetido' ? true : !r.avisado;
+    }
+
+    if (puedeAvisar) {
+      proximos.push({ ...r, diasRestantes: dias });
+
+      // Mostrar toast si está permitido
+      if (localStorage.getItem('mostrarToast') !== '0') {
+        mostrarToast(
+          `🔔 Recordatorio próximo: ${r.titulo} (${dias === 0 ? 'HOY' : 'en ' + dias + ' días'})`,
+          'info'
+        );
+      }
+
+      // Reproducir sonido
+      reproducirSonidoAviso();
+
+      // Si tiene repetición por minutos configurada, actualizar timestamp
+      if (r.repetirMismoDia && r.intervaloMinutos) {
+        r.ultimoAvisoMismoDia = new Date().toISOString();
+        await updateRecordatorio(r);
+      } else if (modoAviso === 'unico') {
+        // Marcar como avisado solo si NO tiene repetición por minutos
+        r.avisado = true;
+        await updateRecordatorio(r);
+      }
+    }
+  }
+
+  // Render de la lista visual
+  if (!proximos.length) {
+    ul.innerHTML = '<li style="color:var(--text-light);font-style:italic;">No hay avisos próximos.</li>';
+    return;
+  }
+
+  let html = '';
+  proximos
+    .sort((a, b) => a.diasRestantes - b.diasRestantes)
+    .forEach(p => {
+      html += `<li style="margin-bottom:0.5rem;">
+        <strong>${p.titulo}</strong> — ${p.diasRestantes === 0 ? '¡HOY!' : p.diasRestantes + ' días'}
+        ${p.descripcion ? `<br><small>${p.descripcion}</small>` : ''}
+      </li>`;
+    });
+
+  ul.innerHTML = html;
+}
+
+/* ---------- Configuración global ---------- */
+function guardarDefaultAnticipacion() {
+  const d = document.getElementById('defaultAnticipacion').value;
+  localStorage.setItem('defaultAnticipacion', d);
+  mostrarToast('✅ Valor por defecto guardado', 'success');
+}
+async function aplicarDefaultATodos() {
+  const def = parseInt(localStorage.getItem('defaultAnticipacion') || 5);
+  const todos = await getAllRecordatorios();
+  for (const r of todos) {
+    r.diasAnticipacion = def;
+    await updateRecordatorio(r);
+  }
+  mostrarToast(`✅ Anticipación de ${def} días aplicada a todos`, 'success');
+  await renderizarRecordatorios();
+}
+
+/* ---------- Ayuda ---------- */
+function mostrarAyudaRecordatorios() {
+  mostrarModalAyuda(`
+    <h2>⏰ ¿Cómo funcionan los Recordatorios?</h2>
+    <ul>
+      <li><strong>Anticipación configurable:</strong> Elige cuántos días antes quieres ser avisado (por defecto 5).</li>
+      <li><strong>Global o individual:</strong> Puedes cambiar el valor para TODOS los recordatorios o solo para uno.</li>
+      <li><strong>Avisos automáticos:</strong> Al cargar la pestaña se muestran los próximos eventos.</li>
+    </ul>
+    <p style="font-size:0.85rem;color:var(--text-light)">💡 Los recordatorios se guardan localmente (IndexedDB) y no se pierden al cerrar el navegador.</p>
+  `, 'modalAyudaRecordatorios');
+}
+function cerrarAyudaRecordatorios() {
+  const m = document.getElementById('modalAyudaRecordatorios');
+  if (m) m.style.display = 'none';
+}
+
+/* ---------- Lanzar al mostrar pestaña ---------- */
+async function renderizarRecordatoriosPestana() {
+  // Primero renderizamos todo el HTML de la pestaña
+  await renderizarRecordatorios();
+  await renderizarProximosAvisos();
+
+  // Lista de IDs de inputs y su valor por defecto si no existe en localStorage
+  const inputs = [
+    { id: 'defaultAnticipacion', default: 5 },
+    { id: 'modoAvisoDiario', default: 'unico' },
+    { id: 'prioridadRecordatorio', default: 'media' },
+    { id: 'repeticionRecordatorio', default: 'ninguna' },
+    // Agrega más campos aquí si es necesario
+    // { id: 'otroInput', default: 'valorPorDefecto' }
+  ];
+
+  inputs.forEach(({ id, default: def }) => {
+    const el = document.getElementById(id);
+    if (el) {
+      // Cargar valor desde localStorage o valor por defecto
+      el.value = localStorage.getItem(id) ?? def;
+
+      // Guardar automáticamente cambios en localStorage
+      el.addEventListener('input', () => {
+        localStorage.setItem(id, el.value);
+      });
+    }
+  });
+
+  // SONIDO SELECCIONADO
+const selSonido = document.getElementById('selectSonido');
+if(selSonido) {
+  const valorGuardado = localStorage.getItem('sonidoSeleccionado') || 'default';
+  selSonido.value = valorGuardado;
+
+  selSonido.addEventListener('change', () => {
+    localStorage.setItem('sonidoSeleccionado', selSonido.value);
+  });
+}
+
+
+  // Renderizar lista con colores
+  await renderizarRecordatorios()
+}
+
+// ✅ Función para mostrar el formulario de recuperación con preguntas de seguridad
+function mostrarAyudaPinOlvidado() {
+    const modal = document.getElementById('modalBloqueo');
+    if (!modal) {
+      console.error('❌ Modal de bloqueo no encontrado.');
+      return;
+    }
+  
+    const pregunta1 = localStorage.getItem('preguntaSeguridad1');
+    const pregunta2 = localStorage.getItem('preguntaSeguridad2');
+  
+    if (!pregunta1 || !pregunta2) {
+      alert('No se han configurado preguntas de seguridad.');
+      return;
+    }
+  
+    // Mapear los valores internos a textos legibles
+    const preguntasLegibles = {
+      'nombreMadre': 'Nombre de tu madre',
+      'nombrePadre': 'Nombre de tu padre',
+      'nombreMascota': 'Nombre de tu primera mascota',
+      'ciudadNatal': 'Ciudad donde naciste',
+      'mejorAmigo': 'Nombre de tu mejor amigo/a de la infancia',
+      'primeraEscuela': 'Nombre de tu primera escuela',
+      'comidaFavorita': 'Tu comida favorita'
+    };
+  
+    const textoPregunta1 = preguntasLegibles[pregunta1] || pregunta1;
+    const textoPregunta2 = preguntasLegibles[pregunta2] || pregunta2;
+  
+    const html = `
+      <div style="background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem; width: 90%; max-width: 500px; text-align: center;">
+        <h2 style="color: var(--primary); margin-bottom: 1rem;">🔐 Recuperación de Acceso</h2>
+        <p style="color: var(--text-light); line-height: 1.6; margin-bottom: 1.5rem;">
+          Responde las siguientes preguntas de seguridad para recuperar el acceso.
+        </p>
+  
+        <div style="margin-bottom: 1rem; text-align: left;">
+          <label for="respuestaRecuperacion1" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text);">${textoPregunta1}</label>
+          <input type="text" id="respuestaRecuperacion1" placeholder="Respuesta" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        </div>
+  
+        <div style="margin-bottom: 1rem; text-align: left;">
+          <label for="respuestaRecuperacion2" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text);">${textoPregunta2}</label>
+          <input type="text" id="respuestaRecuperacion2" placeholder="Respuesta" style="width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 1rem;" />
+        </div>
+  
+        <button onclick="verificarRespuestasRecuperacion()" style="width: 100%; padding: 0.75rem; font-size: 1rem; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer;">✅ Verificar Respuestas</button>
+        <button onclick="volverAModalBloqueo()" style="width: 100%; padding: 0.75rem; font-size: 1rem; background: var(--danger); color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 1rem;">Cancelar</button>
+      </div>
+    `;
+  
+    modal.innerHTML = html;
+  }
+
+// ✅ Función para volver al modal de bloqueo (donde pide el PIN)
+function volverAModalBloqueo() {
+    const modal = document.getElementById('modalBloqueo');
+    if (!modal) {
+      console.error('❌ Modal de bloqueo no encontrado.');
+      return;
+    }
+  
+    const html = `
+      <div style="background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 2rem; width: 90%; max-width: 350px; text-align: center;">
+        <h2>🔒 SISTEMA DE FINANZAS</h2>
+        <p style="color: var(--text-light); margin-bottom: 1.5rem;">Ingresa tu PIN de 4 dígitos para acceder.</p>
+        <input type="password" id="pinInput" maxlength="4" minlength="4" placeholder="PIN de 4 dígitos" style="width: 100%; padding: 1rem; font-size: 1.5rem; text-align: center; margin-bottom: 1.5rem; border: 1px solid var(--text-light); border-radius: 8px;" title="Escribe 'reset' si olvidaste tu PIN (solo para recuperación)" />
+        <button onclick="desbloquearApp()" style="width: 100%; padding: 1rem; font-size: 1rem; background: #0b57d0; color: white; border: none; border-radius: 8px;">Desbloquear</button>
+        <button onclick="mostrarAyudaPinOlvidado()" style="width: 100%; padding: 0.75rem; margin-top: 1rem; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 8px; font-size: 0.9rem;">¿Olvidaste tu PIN?</button>
+      </div>
+    `;
+  
+    modal.innerHTML = html;
+  }
+
+// FUNCIÓN PARA REPRODUCIR EL SONIDO ELEGIDO EN LA PESTAÑA RECORDATORIOS
+function reproducirSonidoAviso() {
+  const seleccionado = localStorage.getItem('sonidoSeleccionado') || 'default';
+  const personalizado = localStorage.getItem('sonidoPersonalizado');
+
+  let audioSrc = '';
+
+  if (personalizado && seleccionado === 'default') {
+    audioSrc = personalizado;
+  } else {
+    switch (seleccionado) {
+      case 'chime':
+        audioSrc = 'sonidos/chime.mp3';
+        break;
+      case 'alert':
+        audioSrc = 'sonidos/alert.mp3';
+        break;
+      case 'none':
+        return; // sin sonido
+      default:
+        // sonido por defecto (si existe en tu carpeta)
+        audioSrc = 'sonidos/default.mp3';
+    }
+  }
+
+  try {
+    const audio = new Audio(audioSrc);
+    audio.play().catch(err => console.warn('No se pudo reproducir el sonido:', err));
+  } catch (err) {
+    console.error('Error al reproducir sonido:', err);
+  }
+}
+
+// FUNCIONES AUXILIARES DE LA PESTAÑA DE RECORDATORIOS
+function toggleAvisosVisuales() {
+  const estado = document.getElementById('mostrarToast').checked;
+  localStorage.setItem('mostrarToast', estado ? '1' : '0');
+}
+
+function toggleVencidos() {
+  const estado = document.getElementById('mostrarVencidos').checked;
+  localStorage.setItem('mostrarVencidos', estado ? '1' : '0');
+}
+
+function exportarRecordatorios() {
+  getAllRecordatorios().then(data => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'recordatorios_backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function importarRecordatorios(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const data = JSON.parse(e.target.result);
+    for (const rec of data) {
+      await addRecordatorio(rec);
+    }
+    mostrarToast('✅ Recordatorios importados correctamente', 'success');
+    renderizarRecordatorios();
+  };
+  reader.readAsText(file);
+}
+
+function guardarModoAvisoDiario() {
+  const modo = document.getElementById('modoAvisoDiario').value;
+  localStorage.setItem('modoAvisoDiario', modo);
+  mostrarToast('⚙️ Configuración de recordatorios actualizada', 'info');
+}
+
+// Función para mostrar/ocultar el campo de intervalo de repetición
+function toggleRepeticionMismoDia() {
+  const checkbox = document.getElementById('repetirMismoDia');
+  const container = document.getElementById('intervaloRepeticionContainer');
+  if (container) {
+    container.style.display = checkbox.checked ? 'block' : 'none';
+  }
+}
+
+// Función de depuración para verificar el estado de los recordatorios
+async function debugRecordatorios() {
+  const todos = await getAllRecordatorios();
+  const ahora = new Date();
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  hoy.setHours(0, 0, 0, 0);
+  
+  console.log('=== DEBUG RECORDATORIOS ===');
+  console.log('Fecha actual:', ahora.toLocaleString());
+  console.log('Hoy normalizado:', hoy.toLocaleDateString());
+  console.log('Total recordatorios:', todos.length);
+  
+  todos.forEach((r, index) => {
+    const fLim = new Date(r.fechaLimite + 'T00:00:00');
+    fLim.setHours(0, 0, 0, 0);
+    const diasRest = Math.floor((fLim - hoy) / (1000 * 60 * 60 * 24));
+    const dentroRango = diasRest <= r.diasAnticipacion && diasRest >= 0;
+    
+    console.log(`\n[${index + 1}] ${r.titulo}`);
+    console.log('  - Fecha límite:', r.fechaLimite);
+    console.log('  - Días restantes:', diasRest);
+    console.log('  - Días anticipación:', r.diasAnticipacion);
+    console.log('  - Dentro del rango:', dentroRango);
+    console.log('  - Repetir mismo día:', r.repetirMismoDia);
+    console.log('  - Intervalo minutos:', r.intervaloMinutos);
+    console.log('  - Último aviso:', r.ultimoAvisoMismoDia || 'Nunca');
+    
+    if (dentroRango && r.repetirMismoDia && r.intervaloMinutos) {
+      const ahoraMs = ahora.getTime();
+      let ultimoAviso = 0;
+      if (r.ultimoAvisoMismoDia) {
+        const fechaUltimoAviso = new Date(r.ultimoAvisoMismoDia);
+        const fechaUltimoAvisoNormalizada = new Date(fechaUltimoAviso.getFullYear(), fechaUltimoAviso.getMonth(), fechaUltimoAviso.getDate());
+        const hoyNormalizado = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        if (fechaUltimoAvisoNormalizada.getTime() === hoyNormalizado.getTime()) {
+          ultimoAviso = fechaUltimoAviso.getTime();
+        }
+      }
+      const intervaloMs = r.intervaloMinutos * 60 * 1000;
+      const tiempoDesdeUltimoAviso = ahoraMs - ultimoAviso;
+      const minutosDesdeUltimo = Math.round(tiempoDesdeUltimoAviso / 1000 / 60);
+      console.log('  - Tiempo desde último aviso:', minutosDesdeUltimo, 'minutos');
+      console.log('  - Intervalo requerido:', r.intervaloMinutos, 'minutos');
+      console.log('  - Debe avisar:', ultimoAviso === 0 || tiempoDesdeUltimoAviso >= intervaloMs);
+    }
+  });
+  console.log('=== FIN DEBUG ===');
+}
+
+// Exponer función de debug en la consola
+window.debugRecordatorios = debugRecordatorios;
+
+// =========================================================
+// 🔔 Revisión automática de recordatorios en segundo plano
+// =========================================================
+async function revisarRecordatoriosEnSegundoPlano() {
+  try {
+    const todos = await getAllRecordatorios();
+    if (!todos || todos.length === 0) return;
+
+    const ahora = new Date();
+    const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    hoy.setHours(0, 0, 0, 0); // normalizar hora para contar días completos
+
+    const modoAviso = localStorage.getItem('modoAvisoDiario') || 'unico';
+    const mostrarToastActivo = localStorage.getItem('mostrarToast') !== '0';
+
+    for (const r of todos) {
+      // Verificar que el recordatorio tenga los campos necesarios
+      if (!r.fechaLimite) continue;
+      
+      const fLim = new Date(r.fechaLimite + 'T00:00:00');
+      fLim.setHours(0, 0, 0, 0);
+
+      // 🔧 CORRECCIÓN: usar Math.floor consistentemente
+      const diasRest = Math.floor((fLim - hoy) / (1000 * 60 * 60 * 24));
+      const dentroRango = diasRest <= r.diasAnticipacion && diasRest >= 0;
+      
+      // Si está dentro del rango y tiene repetición configurada, verificar intervalo
+      let puedeAvisar = false;
+      if (dentroRango && r.repetirMismoDia && r.intervaloMinutos) {
+        const ahoraMs = ahora.getTime();
+        let ultimoAviso = 0;
+        
+        // Verificar si el último aviso fue del mismo día
+        if (r.ultimoAvisoMismoDia) {
+          const fechaUltimoAviso = new Date(r.ultimoAvisoMismoDia);
+          const fechaUltimoAvisoNormalizada = new Date(fechaUltimoAviso.getFullYear(), fechaUltimoAviso.getMonth(), fechaUltimoAviso.getDate());
+          const hoyNormalizado = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+          
+          // Solo usar el último aviso si es del mismo día
+          if (fechaUltimoAvisoNormalizada.getTime() === hoyNormalizado.getTime()) {
+            ultimoAviso = fechaUltimoAviso.getTime();
+          } else {
+            // Resetear si es de otro día
+            r.ultimoAvisoMismoDia = null;
+            await updateRecordatorio(r);
+          }
+        }
+        
+        const intervaloMs = r.intervaloMinutos * 60 * 1000;
+        const tiempoDesdeUltimoAviso = ahoraMs - ultimoAviso;
+        
+        // Si nunca se ha avisado hoy o ha pasado el intervalo
+        if (ultimoAviso === 0 || tiempoDesdeUltimoAviso >= intervaloMs) {
+          puedeAvisar = true;
+          console.log(`[Recordatorios] Aviso activado: ${r.titulo} - Intervalo: ${r.intervaloMinutos} min, Tiempo desde último: ${Math.round(tiempoDesdeUltimoAviso / 1000 / 60)} min`);
+        }
+      } else if (dentroRango) {
+        // Lógica normal para días anteriores (sin repetición por minutos)
+        puedeAvisar = modoAviso === 'repetido' ? true : !r.avisado;
+      }
+
+      if (puedeAvisar) {
+        if (mostrarToastActivo) {
+          const mensaje = `🔔 Recordatorio: ${r.titulo} (${diasRest === 0 ? 'HOY' : 'en ' + diasRest + ' días'})`;
+          mostrarToast(mensaje, 'info');
+          console.log(`[Recordatorios] Toast mostrado: ${mensaje}`);
+        }
+
+        reproducirSonidoAviso();
+
+        // Si tiene repetición por minutos configurada, actualizar timestamp
+        if (r.repetirMismoDia && r.intervaloMinutos) {
+          r.ultimoAvisoMismoDia = ahora.toISOString();
+          await updateRecordatorio(r);
+        } else if (modoAviso === 'unico') {
+          // Marcar como avisado solo si NO tiene repetición por minutos
+          r.avisado = true;
+          await updateRecordatorio(r);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error revisando recordatorios en segundo plano:', err);
+  }
+}
+
+// Ejecutar al cargar y luego cada 30 segundos para mayor precisión
+// Esto permite que intervalos cortos (como 1-3 minutos) funcionen correctamente
+setTimeout(revisarRecordatoriosEnSegundoPlano, 5000); // primera revisión a los 5s
+setInterval(revisarRecordatoriosEnSegundoPlano, 30000); // cada 30 segundos (para soportar intervalos cortos)
+
+//NOTAS
+// =========================================================
+// ✅ SISTEMA DE NOTAS (CRUD - Create, Read, Update, Delete)
+// =========================================================
+
+/* - CRUD - */
+async function addNota(nota) {
+    return addEntry(STORES.NOTAS, nota);
+}
+
+async function getAllNotas() {
+    return getAllEntries(STORES.NOTAS);
+}
+
+async function updateNota(nota) {
+    return updateEntry(STORES.NOTAS, nota);
+}
+
+async function deleteNota(id) {
+    return deleteEntry(STORES.NOTAS, id);
+}
+
+/* - Función para renderizar la lista de notas - */
+async function renderizarNotas() {
+    const notas = await getAllNotas();
+    const contenedor = document.getElementById('contenedorNotas');
+    const mensajeSinNotas = document.getElementById('mensajeSinNotas');
+
+    if (notas.length === 0) {
+        contenedor.innerHTML = '';
+        mensajeSinNotas.style.display = 'block';
+        return;
+    }
+
+    mensajeSinNotas.style.display = 'none';
+
+    let html = '';
+    notas.forEach(nota => {
+        html += `
+            <div class="tarjeta-nota" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow-sm); transition: transform 0.2s; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0; color: var(--text);">${nota.titulo}</h4>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button onclick="editarNota(${nota.id})" title="Editar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">✏️</button>
+                        <button onclick="eliminarNota(${nota.id})" title="Eliminar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">🗑️</button>
+                    </div>
+                </div>
+                <p style="margin: 0.5rem 0 0 0; color: var(--text-light); font-size: 0.9rem; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">
+                    ${nota.contenido}
+                </p>
+                <small style="display: block; margin-top: 0.5rem; color: var(--text-light); font-size: 0.8rem;">
+                    📅 ${new Date(nota.fechaCreacion).toLocaleDateString('es-VE')} · ⏰ ${new Date(nota.fechaCreacion).toLocaleTimeString('es-VE')}
+                </small>
+            </div>
+        `;
+    });
+
+    contenedor.innerHTML = html;
+}
+
+/* - Función para guardar una nota - */
+async function guardarNota() {
+    const idEditando = document.getElementById('idNotaEditando').value;
+    const titulo = document.getElementById('tituloNota').value.trim();
+    const contenido = document.getElementById('contenidoNota').value.trim();
+
+    if (!titulo || !contenido) {
+        mostrarToast('❌ Título y contenido son obligatorios', 'danger');
+        return;
+    }
+
+    const nota = {
+        titulo,
+        contenido,
+        fechaCreacion: new Date().toISOString()
+    };
+
+    try {
+        if (idEditando) {
+            // Actualizar nota existente
+            nota.id = parseInt(idEditando);
+            await updateNota(nota);
+            mostrarToast('✅ Nota actualizada', 'success');
+        } else {
+            // Crear nueva nota
+            await addNota(nota);
+            mostrarToast('✅ Nota guardada', 'success');
+        }
+
+        limpiarFormularioNota();
+        await renderizarNotas(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al guardar la nota:", error);
+        mostrarToast('❌ Error al guardar la nota', 'danger');
+    }
+}
+
+/* - Función para editar una nota - */
+async function editarNota(id) {
+    const notas = await getAllNotas();
+    const nota = notas.find(n => n.id === id);
+
+    if (!nota) return;
+
+    document.getElementById('idNotaEditando').value = nota.id;
+    document.getElementById('tituloNota').value = nota.titulo;
+    document.getElementById('contenidoNota').value = nota.contenido;
+
+    // ✅ Mostrar toast informativo
+    mostrarToast(`✏️ Editando nota: "${nota.titulo}"`, 'info');
+
+    // Cambiar el texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-notas button[onclick="guardarNota()"]');
+    if (btnGuardar) btnGuardar.textContent = 'Actualizar Nota';
+
+    // Desplazar hacia el formulario
+    document.getElementById('formularioNota').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* - Función para eliminar una nota - */
+async function eliminarNota(id) {
+    // Usar la función de confirmación moderna (modal personalizado)
+    const confirmado = await mostrarConfirmacion('¿Estás seguro de que quieres eliminar esta nota?');
+
+    if (!confirmado) return; // Si el usuario cancela, no hacemos nada
+
+    try {
+        await deleteNota(id);
+        mostrarToast('✅ Nota eliminada con éxito', 'success'); // Mensaje específico
+        await renderizarNotas(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al eliminar la nota:", error);
+        mostrarToast('❌ Error al eliminar la nota', 'danger');
+    }
+}
+
+/* - Función para limpiar el formulario - */
+function limpiarFormularioNota() {
+    document.getElementById('idNotaEditando').value = '';
+    document.getElementById('tituloNota').value = '';
+    document.getElementById('contenidoNota').value = '';
+    // Restaurar texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-notas button[onclick="guardarNota()"]');
+    if (btnGuardar) btnGuardar.textContent = '💾 Guardar Nota';
+}
+
+/* - Función para mostrar ayuda de Notas - */
+function mostrarAyudaNotas() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📝 Guía de Notas</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Agregar notas:</strong> Escribe títulos y contenido para guardar tus ideas.</li>
+                <li><strong>Editar notas:</strong> Haz clic en el lápiz (✏️) para modificar una nota existente.</li>
+                <li><strong>Eliminar notas:</strong> Usa la papelera (🗑️) para borrar notas que ya no necesitas.</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa las notas para recordatorios personales, ideas de inversión o cualquier dato que quieras tener a mano.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaNotas');
+}
+
+// =========================================================
+// ✅ SISTEMA DE PROVEEDORES Y PAGOS (CRUD - Create, Read, Update, Delete)
+// =========================================================
+
+/* - CRUD - */
+async function addPago(pago) {
+    return addEntry(STORES.PROVEEDORES, pago);
+}
+
+async function getAllPagos() {
+    return getAllEntries(STORES.PROVEEDORES);
+}
+
+async function updatePago(pago) {
+    return updateEntry(STORES.PROVEEDORES, pago);
+}
+
+async function deletePago(id) {
+    return deleteEntry(STORES.PROVEEDORES, id);
+}
+
+/* - Función para renderizar la lista de pagos - */
+async function renderizarPagos() {
+    const pagos = await getAllPagos();
+    const contenedor = document.getElementById('contenedorPagos');
+    const filtroEstado = document.getElementById('filtroEstadoPago').value;
+    const filtroProveedor = document.getElementById('filtroProveedor').value;
+
+    // Filtrar pagos
+    let pagosFiltrados = pagos;
+    if (filtroEstado) {
+        pagosFiltrados = pagosFiltrados.filter(p => p.estado === filtroEstado);
+    }
+    if (filtroProveedor) {
+        pagosFiltrados = pagosFiltrados.filter(p => p.nombreProveedor === filtroProveedor);
+    }
+
+    // Actualizar el select de proveedores
+    actualizarSelectProveedores(pagos);
+
+    if (pagosFiltrados.length === 0) {
+    let mensajeHTML = `
+        <div style="text-align: center; padding: 2rem; color: var(--text-light); background: rgba(var(--primary-rgb), 0.05); border-radius: var(--radius); border-left: 4px solid var(--primary);">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
+            <h3 style="margin: 0 0 0.5rem 0; color: var(--text);">No hay pagos registrados</h3>
+            <p style="margin: 0 0 1rem 0; font-size: 0.9rem;">Registra tu primer pago para empezar a gestionar tus obligaciones con proveedores.</p>
+            <button onclick="document.getElementById('nombreProveedor').focus()" style="background: var(--primary); color: white; border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-size: 0.9rem; cursor: pointer;">
+                ➕ Registrar Pago
+            </button>
+        </div>
+    `;
+    contenedor.innerHTML = mensajeHTML;
+    return;
+}
+
+    let html = '';
+    pagosFiltrados.forEach(pago => {
+        html += `
+            <div class="tarjeta-pago" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow-sm); transition: transform 0.2s; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0; color: var(--text);">${pago.nombreProveedor}</h4>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button onclick="editarPago(${pago.id})" title="Editar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">✏️</button>
+                        <button onclick="eliminarPago(${pago.id})" title="Eliminar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">🗑️</button>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">📅 ${new Date(pago.fechaPago).toLocaleDateString('es-VE')}</span>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">💰 Bs. ${formatNumberVE(pago.monto)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">💳 ${pago.metodoPago}</span>
+                    <span style="font-size: 0.9rem; ${pago.estado === 'pagado' ? 'color: var(--success)' : 'color: var(--warning)'};">${pago.estado === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}</span>
+                </div>
+                ${pago.descripcion ? `<p style="margin: 0.5rem 0 0 0; color: var(--text-light); font-size: 0.9rem; line-height: 1.4;">${pago.descripcion}</p>` : ''}
+            </div>
+        `;
+    });
+
+    contenedor.innerHTML = html;
+}
+
+/* - Función para actualizar el select de proveedores - */
+function actualizarSelectProveedores(pagos) {
+    const select = document.getElementById('filtroProveedor');
+    const proveedoresUnicos = [...new Set(pagos.map(p => p.nombreProveedor))].sort();
+
+    select.innerHTML = '<option value="">Todos los proveedores</option>';
+    proveedoresUnicos.forEach(proveedor => {
+        const opt = document.createElement('option');
+        opt.value = proveedor;
+        opt.textContent = proveedor;
+        select.appendChild(opt);
+    });
+}
+
+/* - Función para guardar un pago - */
+async function guardarPago() {
+    const idEditando = document.getElementById('idPagoEditando').value;
+    const nombreProveedor = document.getElementById('nombreProveedor').value.trim();
+    const monto = document.getElementById('montoPago').value.trim();
+    const fechaPago = document.getElementById('fechaPago').value;
+    const metodoPago = document.getElementById('metodoPago').value;
+    const estado = document.getElementById('estadoPago').value;
+    const descripcion = document.getElementById('descripcionPago').value.trim();
+
+    if (!nombreProveedor || !monto || !fechaPago || !metodoPago) {
+        mostrarToast('❌ Todos los campos son obligatorios', 'danger');
+        return;
+    }
+
+    const pago = {
+        nombreProveedor,
+        monto: parseFloat(monto.replace(/[.,]/g, '')),
+        fechaPago,
+        metodoPago,
+        estado,
+        descripcion,
+        fechaCreacion: new Date().toISOString()
+    };
+
+    try {
+        if (idEditando) {
+            // Actualizar pago existente
+            pago.id = parseInt(idEditando);
+            await updatePago(pago);
+            mostrarToast('✅ Pago actualizado', 'success');
+        } else {
+            // Crear nuevo pago
+            await addPago(pago);
+            mostrarToast('✅ Pago registrado', 'success');
+        }
+
+        limpiarFormularioPago();
+        await renderizarPagos(); // Recargar la lista
+        await renderizarGraficoProveedores(); // Actualizar el gráfico
+    } catch (error) {
+        console.error("Error al guardar el pago:", error);
+        mostrarToast('❌ Error al guardar el pago', 'danger');
+    }
+}
+
+/* - Función para editar un pago - */
+async function editarPago(id) {
+    const pagos = await getAllPagos();
+    const pago = pagos.find(p => p.id === id);
+
+    if (!pago) return;
+
+    document.getElementById('idPagoEditando').value = pago.id;
+    document.getElementById('nombreProveedor').value = pago.nombreProveedor;
+    document.getElementById('montoPago').value = formatNumberVE(pago.monto);
+    document.getElementById('fechaPago').value = pago.fechaPago;
+    document.getElementById('metodoPago').value = pago.metodoPago;
+    document.getElementById('estadoPago').value = pago.estado;
+    document.getElementById('descripcionPago').value = pago.descripcion;
+
+    // Cambiar el texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-proveedores-pagos button[onclick="guardarPago()"]');
+    if (btnGuardar) btnGuardar.textContent = 'Actualizar Pago';
+
+    // Desplazar hacia el formulario
+    document.getElementById('registroProveedor').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* - Función para eliminar un pago - */
+async function eliminarPago(id) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este pago?')) return;
+
+    try {
+        await deletePago(id);
+        mostrarToast('✅ Pago eliminado', 'success');
+        await renderizarPagos(); // Recargar la lista
+        await renderizarGraficoProveedores(); // Actualizar el gráfico
+    } catch (error) {
+        console.error("Error al eliminar el pago:", error);
+        mostrarToast('❌ Error al eliminar el pago', 'danger');
+    }
+}
+
+/* - Función para limpiar el formulario - */
+function limpiarFormularioPago() {
+    document.getElementById('idPagoEditando').value = '';
+    document.getElementById('nombreProveedor').value = '';
+    document.getElementById('montoPago').value = '';
+    document.getElementById('fechaPago').value = '';
+    document.getElementById('metodoPago').value = '';
+    document.getElementById('estadoPago').value = 'pendiente';
+    document.getElementById('descripcionPago').value = '';
+    // Restaurar texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-proveedores-pagos button[onclick="guardarPago()"]');
+    if (btnGuardar) btnGuardar.textContent = '💾 Guardar Pago';
+}
+
+/* - Función para mostrar ayuda de Proveedores - */
+function mostrarAyudaProveedores() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">💼 Guía de Proveedores y Pagos</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Registrar pagos:</strong> Anota a quién le pagas, cuánto y cuándo.</li>
+                <li><strong>Editar pagos:</strong> Modifica los detalles de un pago ya registrado.</li>
+                <li><strong>Eliminar pagos:</strong> Borra pagos que ya no necesitas.</li>
+                <li><strong>Filtrar pagos:</strong> Busca por estado o proveedor específico.</li>
+                <li><strong>Gráficos de gasto:</strong> Visualiza cuánto gastas con cada proveedor.</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa esta herramienta para tener un control preciso de tus obligaciones con terceros y planificar mejor tus flujos de efectivo.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaProveedores');
+}
+
+/* - Función para renderizar el gráfico de gasto por proveedor - */
+async function renderizarGraficoProveedores() {
+    const pagos = await getAllPagos();
+    const canvas = document.getElementById('graficoProveedores');
+
+    if (!canvas) return;
+
+    // Agrupar por proveedor y sumar montos
+    const gastosPorProveedor = {};
+    pagos.forEach(pago => {
+        const proveedor = pago.nombreProveedor;
+        gastosPorProveedor[proveedor] = (gastosPorProveedor[proveedor] || 0) + pago.monto;
+    });
+
+    // Si no hay datos, mostrar un mensaje estilizado
+    if (Object.keys(gastosPorProveedor).length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dibujar un mensaje estilizado
+        const mensaje = "No hay pagos registrados";
+        const subMensaje = "Registra tu primer pago para ver el gráfico.";
+        const icono = "📁"; // Ícono de carpeta vacía
+
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = 'var(--text-light)';
+        ctx.textAlign = 'center';
+
+        // Dibujar el ícono
+        ctx.font = 'bold 40px Arial';
+        ctx.fillText(icono, canvas.width / 2, canvas.height / 2 - 40);
+
+        // Dibujar el mensaje principal
+        ctx.font = 'bold 18px Arial';
+        ctx.fillText(mensaje, canvas.width / 2, canvas.height / 2 + 20);
+
+        // Dibujar el submensaje
+        ctx.font = '14px Arial';
+        ctx.fillStyle = 'var(--text-light)';
+        ctx.fillText(subMensaje, canvas.width / 2, canvas.height / 2 + 50);
+
+        return;
+    }
+
+    // Preparar datos para el gráfico
+    const labels = Object.keys(gastosPorProveedor);
+    const data = Object.values(gastosPorProveedor);
+
+    // Colores aleatorios para cada proveedor
+    const colors = labels.map(() => {
+        const hue = Math.floor(Math.random() * 360);
+        return `hsl(${hue}, 70%, 60%)`;
+    });
+
+    // Destruir el gráfico anterior si existe y es válido
+    if (window.graficoProveedores && typeof window.graficoProveedores.destroy === 'function') {
+        window.graficoProveedores.destroy();
+    }
+
+    // Crear el nuevo gráfico
+    window.graficoProveedores = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Gasto por Proveedor',
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const percentage = ((value / data.reduce((a, b) => a + b, 0)) * 100).toFixed(1);
+                            return `${label}: Bs. ${formatNumberVE(value)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+}
+
+// =========================================================
+// ✅ SISTEMA DE INVENTARIO / ACTIVOS (CRUD - Create, Read, Update, Delete)
+// =========================================================
+
+/* - CRUD - */
+async function addActivo(activo) {
+    return addEntry(STORES.INVENTARIO, activo);
+}
+
+async function getAllActivos() {
+    return getAllEntries(STORES.INVENTARIO);
+}
+
+async function updateActivo(activo) {
+    return updateEntry(STORES.INVENTARIO, activo);
+}
+
+async function deleteActivo(id) {
+    return deleteEntry(STORES.INVENTARIO, id);
+}
+
+/* - Función para renderizar la lista de activos - */
+async function renderizarActivos() {
+    const activos = await getAllActivos();
+    const contenedor = document.getElementById('contenedorActivos');
+    const filtroEstado = document.getElementById('filtroEstadoActivo').value;
+    const filtroCategoria = document.getElementById('filtroCategoriaActivo').value;
+
+    // Filtrar activos
+    let activosFiltrados = activos;
+    if (filtroEstado) {
+        activosFiltrados = activosFiltrados.filter(a => a.estado === filtroEstado);
+    }
+    if (filtroCategoria) {
+        activosFiltrados = activosFiltrados.filter(a => a.categoria === filtroCategoria);
+    }
+
+    // Actualizar el select de categorías
+    actualizarSelectCategoriasActivos(activos);
+
+    if (activosFiltrados.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: var(--text-light);">No hay activos que coincidan con los filtros.</p>';
+        return;
+    }
+
+    let html = '';
+    activosFiltrados.forEach(activo => {
+        html += `
+            <div class="tarjeta-activo" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow-sm); transition: transform 0.2s; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0; color: var(--text);">${activo.nombreActivo}</h4>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button onclick="editarActivo(${activo.id})" title="Editar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">✏️</button>
+                        <button onclick="eliminarActivo(${activo.id})" title="Eliminar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">🗑️</button>
+                    </div>
+                </div>
+                <!-- ✅ NUEVO: Mostrar la categoría -->
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">🏷️ ${activo.categoria || 'Sin categoría'}</span>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">📅 ${new Date(activo.fechaCompra).toLocaleDateString('es-VE')}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">💰 Bs. ${formatNumberVE(activo.valorActivo)}</span>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">📉 ${activo.depreciacionEstimada}% anual</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.9rem; ${activo.estado === 'activo' ? 'color: var(--success)' : activo.estado === 'depreciado' ? 'color: var(--warning)' : 'color: var(--danger)'};">${activo.estado === 'activo' ? '✅ Activo' : activo.estado === 'depreciado' ? '⏳ Depreciado' : '🔴 Vendido'}</span>
+                </div>
+                ${activo.descripcion ? `<p style="margin: 0.5rem 0 0 0; color: var(--text-light); font-size: 0.9rem; line-height: 1.4;">${activo.descripcion}</p>` : ''}
+            </div>
+        `;
+    });
+
+    contenedor.innerHTML = html;
+}
+
+/* - Función para actualizar el select de categorías - */
+function actualizarSelectCategoriasActivos(activos) {
+    const select = document.getElementById('filtroCategoriaActivo');
+    const categoriasUnicas = [...new Set(activos.map(a => a.categoria))].sort();
+
+    select.innerHTML = '<option value="">Todas las categorías</option>';
+    categoriasUnicas.forEach(categoria => {
+        const opt = document.createElement('option');
+        opt.value = categoria;
+        opt.textContent = categoria;
+        select.appendChild(opt);
+    });
+}
+
+/* - Función para guardar un activo - */
+async function guardarActivo() {
+    const idEditando = document.getElementById('idActivoEditando').value;
+    const nombreActivo = document.getElementById('nombreActivo').value.trim();
+    const valorActivo = document.getElementById('valorActivo').value.trim();
+    const fechaCompra = document.getElementById('fechaCompra').value;
+    const depreciacionEstimada = document.getElementById('depreciacionEstimada').value;
+    const descripcion = document.getElementById('descripcionActivo').value.trim();
+    // ✅ NUEVO: Obtener la categoría
+    const categoria = document.getElementById('categoriaActivo').value.trim();
+    const estado = 'activo'; // Por defecto, el activo está activo
+
+    if (!nombreActivo || !valorActivo || !fechaCompra || !depreciacionEstimada) {
+        mostrarToast('❌ Todos los campos son obligatorios', 'danger');
+        return;
+    }
+
+    const activo = {
+        nombreActivo,
+        valorActivo: parseFloat(valorActivo.replace(/[.,]/g, '')),
+        fechaCompra,
+        depreciacionEstimada: parseFloat(depreciacionEstimada),
+        descripcion,
+        // ✅ NUEVO: Guardar la categoría
+        categoria: categoria || 'Sin categoría', // Si no se ingresa, asigna "Sin categoría"
+        estado,
+        fechaCreacion: new Date().toISOString()
+    };
+
+    try {
+        if (idEditando) {
+            // Actualizar activo existente
+            activo.id = parseInt(idEditando);
+            await updateActivo(activo);
+            mostrarToast('✅ Activo actualizado', 'success');
+        } else {
+            // Crear nuevo activo
+            await addActivo(activo);
+            mostrarToast('✅ Activo registrado', 'success');
+        }
+
+        limpiarFormularioActivo();
+        await renderizarActivos(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al guardar el activo:", error);
+        mostrarToast('❌ Error al guardar el activo', 'danger');
+    }
+}
+
+/* - Función para editar un activo - */
+async function editarActivo(id) {
+    const activos = await getAllActivos();
+    const activo = activos.find(a => a.id === id);
+
+    if (!activo) return;
+
+    document.getElementById('idActivoEditando').value = activo.id;
+    document.getElementById('nombreActivo').value = activo.nombreActivo;
+    document.getElementById('valorActivo').value = formatNumberVE(activo.valorActivo);
+    document.getElementById('fechaCompra').value = activo.fechaCompra;
+    document.getElementById('depreciacionEstimada').value = activo.depreciacionEstimada;
+    document.getElementById('descripcionActivo').value = activo.descripcion;
+    // ✅ NUEVO: Cargar la categoría en el input
+    document.getElementById('categoriaActivo').value = activo.categoria || '';
+
+    // Cambiar el texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-inventario-activos button[onclick="guardarActivo()"]');
+    if (btnGuardar) btnGuardar.textContent = 'Actualizar Activo';
+
+    // Desplazar hacia el formulario
+    document.getElementById('registroActivo').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* - Función para eliminar un activo - */
+async function eliminarActivo(id) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este activo?')) return;
+
+    try {
+        await deleteActivo(id);
+        mostrarToast('✅ Activo eliminado', 'success');
+        await renderizarActivos(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al eliminar el activo:", error);
+        mostrarToast('❌ Error al eliminar el activo', 'danger');
+    }
+}
+
+/* - Función para limpiar el formulario - */
+function limpiarFormularioActivo() {
+    document.getElementById('idActivoEditando').value = '';
+    document.getElementById('nombreActivo').value = '';
+    document.getElementById('valorActivo').value = '';
+    document.getElementById('fechaCompra').value = '';
+    document.getElementById('depreciacionEstimada').value = '';
+    document.getElementById('descripcionActivo').value = '';
+    // Restaurar texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-inventario-activos button[onclick="guardarActivo()"]');
+    if (btnGuardar) btnGuardar.textContent = '💾 Guardar Activo';
+}
+
+/* - Función para mostrar ayuda de Inventario - */
+function mostrarAyudaInventario() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📦 Guía de Inventario / Activos</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Registrar activos:</strong> Anota equipos, herramientas o cualquier bien con valor contable.</li>
+                <li><strong>Editar activos:</strong> Modifica los detalles de un activo ya registrado.</li>
+                <li><strong>Eliminar activos:</strong> Borra activos que ya no necesitas.</li>
+                <li><strong>Filtrar activos:</strong> Busca por estado o categoría específica.</li>
+                <li><strong>Exportar inventario:</strong> Genera reportes en Excel o PDF para compartir o archivar.</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa esta herramienta para tener un control preciso de tus activos fijos y planificar mejor su depreciación y reemplazo.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaInventario');
+}
+
+/* - Función para exportar el inventario a Excel - */
+async function exportarInventarioExcel() {
+    const activos = await getAllActivos();
+
+    if (activos.length === 0) {
+        mostrarToast('❌ No hay activos para exportar', 'danger');
+        return;
+    }
+
+    // Crear un libro de trabajo
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+        ['Nombre del Activo', 'Valor Inicial (Bs)', 'Fecha de Compra', 'Depreciación Estimada (%)', 'Estado', 'Descripción']
+    ];
+
+    // Añadir datos de los activos
+    activos.forEach(activo => {
+        wsData.push([
+            activo.nombreActivo,
+            activo.valorActivo,
+            new Date(activo.fechaCompra).toLocaleDateString('es-VE'),
+            activo.depreciacionEstimada,
+            activo.estado,
+            activo.descripcion
+        ]);
+    });
+
+    // Crear la hoja de cálculo
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+
+    // Descargar el archivo
+    XLSX.writeFile(wb, 'Inventario_Activos.xlsx');
+    mostrarToast('✅ Inventario exportado a Excel', 'success');
+}
+
+/* - Función para exportar el inventario a PDF - */
+async function exportarInventarioPDF() {
+    const activos = await getAllActivos();
+
+    if (activos.length === 0) {
+        mostrarToast('❌ No hay activos para exportar', 'danger');
+        return;
+    }
+
+    // Importar jsPDF dinámicamente si no está cargado
+    if (typeof window.jspdf === 'undefined') {
+        await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Título del documento
+    doc.setFontSize(18);
+    doc.text('Inventario de Activos', 20, 20);
+
+    // Encabezados de la tabla
+    doc.setFontSize(12);
+    doc.text('Nombre del Activo', 20, 30);
+    doc.text('Valor Inicial (Bs)', 60, 30);
+    doc.text('Fecha de Compra', 100, 30);
+    doc.text('Depreciación Estimada (%)', 140, 30);
+    doc.text('Estado', 180, 30);
+
+    // Datos de los activos
+    let y = 40;
+    activos.forEach(activo => {
+        doc.setFontSize(10);
+        doc.text(activo.nombreActivo, 20, y);
+        doc.text(formatNumberVE(activo.valorActivo), 60, y);
+        doc.text(new Date(activo.fechaCompra).toLocaleDateString('es-VE'), 100, y);
+        doc.text(`${activo.depreciacionEstimada}%`, 140, y);
+        doc.text(activo.estado, 180, y);
+        y += 10;
+    });
+
+    // Descargar el archivo
+    doc.save('Inventario_Activos.pdf');
+    mostrarToast('✅ Inventario exportado a PDF', 'success');
+}
+
+// =========================================================
+// ✅ SISTEMA DE REPORTES GERENCIALES
+// =========================================================
+
+/* - Función para generar el reporte gerencial - */
+async function generarReporteGerencial() {
+    const periodo = document.getElementById('periodoReporte').value;
+    const fechaInicio = document.getElementById('fechaInicioReporte').value;
+    const fechaFin = document.getElementById('fechaFinReporte').value;
+    const metricas = Array.from(document.getElementById('metricasReporte').selectedOptions).map(opt => opt.value);
+
+    if (!fechaInicio || !fechaFin) {
+        mostrarToast('❌ Por favor, selecciona un rango de fechas', 'danger');
+        return;
+    }
+
+    // Mostrar indicador de carga
+    mostrarToast('⏳ Generando reporte...', 'info');
+
+    try {
+        // Obtener todos los movimientos
+        const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+
+        // Filtrar movimientos por rango de fechas
+        const movimientosFiltrados = movimientos.filter(m => {
+            const fechaMovimiento = new Date(m.fecha);
+            const inicio = new Date(fechaInicio);
+            const fin = new Date(fechaFin);
+            return fechaMovimiento >= inicio && fechaMovimiento <= fin;
+        });
+
+        if (movimientosFiltrados.length === 0) {
+            mostrarToast('❌ No hay movimientos en el rango de fechas seleccionado', 'danger');
+            return;
+        }
+
+        // Calcular métricas
+        const ingresos = movimientosFiltrados.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + m.cantidad, 0);
+        const gastos = movimientosFiltrados.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + m.cantidad, 0);
+        const rentabilidad = ingresos - gastos;
+
+        // Agrupar por categoría
+        const gastosPorCategoria = {};
+        movimientosFiltrados.filter(m => m.tipo === 'gasto').forEach(m => {
+            const cat = m.categoria || 'Sin categoría';
+            gastosPorCategoria[cat] = (gastosPorCategoria[cat] || 0) + m.cantidad;
+        });
+
+        // Obtener top 5 categorías
+        const topCategorias = Object.entries(gastosPorCategoria)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+
+        // Comparativa mensual
+        const comparativaMensual = {};
+        movimientosFiltrados.forEach(m => {
+            const fecha = new Date(m.fecha);
+            const mes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+            if (!comparativaMensual[mes]) {
+                comparativaMensual[mes] = { ingresos: 0, gastos: 0 };
+            }
+            if (m.tipo === 'ingreso') {
+                comparativaMensual[mes].ingresos += m.cantidad;
+            } else {
+                comparativaMensual[mes].gastos += m.cantidad;
+            }
+        });
+
+        // Renderizar el reporte
+        renderizarReporteGerencial({
+            periodo,
+            fechaInicio,
+            fechaFin,
+            metricas,
+            ingresos,
+            gastos,
+            rentabilidad,
+            topCategorias,
+            comparativaMensual
+        });
+
+        // Mostrar la sección de exportación
+        document.getElementById('exportarReporte').style.display = 'block';
+
+        mostrarToast('✅ Reporte generado exitosamente', 'success');
+
+    } catch (error) {
+        console.error("Error al generar el reporte:", error);
+        mostrarToast('❌ Error al generar el reporte', 'danger');
+    }
+}
+
+/* - Función para renderizar el reporte gerencial - */
+function renderizarReporteGerencial(datos) {
+    const contenedor = document.getElementById('contenedorReporte');
+    const { periodo, fechaInicio, fechaFin, metricas, ingresos, gastos, rentabilidad, topCategorias, comparativaMensual } = datos;
+
+    let html = '';
+
+    // Título del reporte
+    html += `<div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--text);">📊 Reporte Gerencial</h3>
+        <p style="color: var(--text-light); margin: 0 0 0.5rem 0;"><strong>Período:</strong> ${new Date(fechaInicio).toLocaleDateString('es-VE')} - ${new Date(fechaFin).toLocaleDateString('es-VE')}</p>
+        <p style="color: var(--text-light); margin: 0;"><strong>Métricas:</strong> ${metricas.join(', ')}</p>
+    </div>`;
+
+    // Ingresos vs Gastos
+    if (metricas.includes('ingresosGastos')) {
+        html += `<div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text);">💰 Ingresos vs Gastos</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border-left: 4px solid var(--success);">
+                    <div style="font-size: 1.5rem; color: var(--success);">📈</div>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text-light);">Ingresos</p>
+                    <p style="font-size: 1.2rem; font-weight: bold; color: var(--success);">Bs. ${formatNumberVE(ingresos)}</p>
+                </div>
+                <div style="text-align: center; padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border-left: 4px solid var(--danger);">
+                    <div style="font-size: 1.5rem; color: var(--danger);">📉</div>
+                    <p style="margin: 0.5rem 0 0 0; color: var(--text-light);">Gastos</p>
+                    <p style="font-size: 1.2rem; font-weight: bold; color: var(--danger);">Bs. ${formatNumberVE(gastos)}</p>
+                </div>
+            </div>
+            <div style="text-align: center; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border-left: 4px solid var(--primary);">
+                <div style="font-size: 1.5rem; color: var(--primary);">📊</div>
+                <p style="margin: 0.5rem 0 0 0; color: var(--text-light);">Rentabilidad</p>
+                <p style="font-size: 1.2rem; font-weight: bold; color: ${rentabilidad >= 0 ? 'var(--success)' : 'var(--danger)'};">Bs. ${formatNumberVE(rentabilidad)}</p>
+            </div>
+        </div>`;
+    }
+
+    // Top Categorías
+    if (metricas.includes('topCategorias')) {
+        html += `<div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text);">🏷️ Top 5 Categorías de Gasto</h4>
+            <ul style="padding: 0; margin: 0; list-style: none;">
+                ${topCategorias.map(([categoria, monto], index) => `
+                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                        <span style="color: var(--text-light); font-size: 0.9rem;">${index + 1}. ${categoria}</span>
+                        <span style="font-size: 0.9rem; color: var(--text-light);">Bs. ${formatNumberVE(monto)}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>`;
+    }
+
+    // Rentabilidad
+    if (metricas.includes('rentabilidad')) {
+        html += `<div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text);">📈 Rentabilidad</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(${rentabilidad >= 0 ? '16, 185, 129' : '239, 68, 68'}, 0.1); border-radius: 8px; border-left: 4px solid ${rentabilidad >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                <div style="font-size: 1.5rem; color: ${rentabilidad >= 0 ? 'var(--success)' : 'var(--danger)'};">${rentabilidad >= 0 ? '📈' : '📉'}</div>
+                <div style="text-align: center;">
+                    <p style="margin: 0 0 0.5rem 0; color: var(--text-light);">Rentabilidad</p>
+                    <p style="font-size: 1.2rem; font-weight: bold; color: ${rentabilidad >= 0 ? 'var(--success)' : 'var(--danger)'};">Bs. ${formatNumberVE(rentabilidad)}</p>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // Comparativa Mensual
+    if (metricas.includes('comparativaMensual')) {
+        html += `<div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--text);">📅 Comparativa Mensual</h4>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--text-light);">
+                            <th style="text-align: left; padding: 0.5rem; font-size: 0.9rem;">Mes</th>
+                            <th style="text-align: right; padding: 0.5rem; font-size: 0.9rem;">Ingresos</th>
+                            <th style="text-align: right; padding: 0.5rem; font-size: 0.9rem;">Gastos</th>
+                            <th style="text-align: right; padding: 0.5rem; font-size: 0.9rem;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(comparativaMensual).map(([mes, datos]) => {
+                            const balance = datos.ingresos - datos.gastos;
+                            return `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 0.5rem; font-size: 0.9rem;">${mes}</td>
+                                    <td style="padding: 0.5rem; text-align: right; font-size: 0.9rem; color: var(--success);">Bs. ${formatNumberVE(datos.ingresos)}</td>
+                                    <td style="padding: 0.5rem; text-align: right; font-size: 0.9rem; color: var(--danger);">Bs. ${formatNumberVE(datos.gastos)}</td>
+                                    <td style="padding: 0.5rem; text-align: right; font-size: 0.9rem; color: ${balance >= 0 ? 'var(--success)' : 'var(--danger)'};">Bs. ${formatNumberVE(balance)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
+    contenedor.innerHTML = html;
+    document.getElementById('contenidoReporte').style.display = 'block';
+}
+
+/* - Función para limpiar la configuración del reporte - */
+function limpiarConfiguracionReporte() {
+    document.getElementById('periodoReporte').value = 'mensual';
+    document.getElementById('fechaInicioReporte').value = '';
+    document.getElementById('fechaFinReporte').value = '';
+    document.getElementById('metricasReporte').value = '';
+    document.getElementById('contenidoReporte').style.display = 'none';
+    document.getElementById('exportarReporte').style.display = 'none';
+}
+
+/* - Función para exportar el reporte a Excel - */
+async function exportarReporteExcel() {
+    const contenedor = document.getElementById('contenedorReporte');
+    if (!contenedor || contenedor.innerHTML.trim() === '') {
+        mostrarToast('❌ No hay reporte para exportar', 'danger');
+        return;
+    }
+
+    // Crear un libro de trabajo
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+        ['Reporte Gerencial'],
+        ['Período:', `${new Date(document.getElementById('fechaInicioReporte').value).toLocaleDateString('es-VE')} - ${new Date(document.getElementById('fechaFinReporte').value).toLocaleDateString('es-VE')}`],
+        [],
+        ['Métricas:', document.getElementById('metricasReporte').selectedOptions.length > 0 ? Array.from(document.getElementById('metricasReporte').selectedOptions).map(opt => opt.value).join(', ') : 'Todas'],
+        [],
+        ['Ingresos vs Gastos'],
+        ['Ingresos', 'Gastos', 'Rentabilidad'],
+        [document.querySelector('[data-metrica="ingresos"]')?.textContent || '0', document.querySelector('[data-metrica="gastos"]')?.textContent || '0', document.querySelector('[data-metrica="rentabilidad"]')?.textContent || '0'],
+        [],
+        ['Top 5 Categorías de Gasto'],
+        ['Posición', 'Categoría', 'Monto']
+    ];
+
+    // Añadir top categorías
+    const topCategorias = Array.from(document.querySelectorAll('#contenedorReporte ul li')).map(li => {
+        const partes = li.textContent.split(': ');
+        return [partes[0].replace('.', ''), partes[0].split('. ')[1], partes[1]];
+    });
+    topCategorias.forEach(categoria => {
+        wsData.push(categoria);
+    });
+
+    // Añadir comparativa mensual
+    wsData.push([], ['Comparativa Mensual'], ['Mes', 'Ingresos', 'Gastos', 'Balance']);
+    const filasComparativa = Array.from(document.querySelectorAll('#contenedorReporte table tbody tr')).map(tr => {
+        const celdas = Array.from(tr.querySelectorAll('td'));
+        return celdas.map(td => td.textContent);
+    });
+    filasComparativa.forEach(fila => {
+        wsData.push(fila);
+    });
+
+    // Crear la hoja de cálculo
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Reporte Gerencial');
+
+    // Descargar el archivo
+    XLSX.writeFile(wb, 'Reporte_Gerencial.xlsx');
+    mostrarToast('✅ Reporte exportado a Excel', 'success');
+}
+
+/* - Función para exportar el reporte a PDF - */
+async function exportarReportePDF() {
+    const contenedor = document.getElementById('contenedorReporte');
+    if (!contenedor || contenedor.innerHTML.trim() === '') {
+        mostrarToast('❌ No hay reporte para exportar', 'danger');
+        return;
+    }
+
+    // Importar jsPDF dinámicamente si no está cargado
+    if (typeof window.jspdf === 'undefined') {
+        await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Título del documento
+    doc.setFontSize(18);
+    doc.text('Reporte Gerencial', 20, 20);
+
+    // Encabezados
+    doc.setFontSize(12);
+    doc.text(`Período: ${new Date(document.getElementById('fechaInicioReporte').value).toLocaleDateString('es-VE')} - ${new Date(document.getElementById('fechaFinReporte').value).toLocaleDateString('es-VE')}`, 20, 30);
+    doc.text(`Métricas: ${Array.from(document.getElementById('metricasReporte').selectedOptions).map(opt => opt.value).join(', ')}`, 20, 40);
+
+    // Ingresos vs Gastos
+    doc.setFontSize(14);
+    doc.text('Ingresos vs Gastos', 20, 60);
+    doc.setFontSize(12);
+    doc.text(`Ingresos: Bs. ${formatNumberVE(document.querySelector('[data-metrica="ingresos"]')?.textContent || '0')}`, 20, 70);
+    doc.text(`Gastos: Bs. ${formatNumberVE(document.querySelector('[data-metrica="gastos"]')?.textContent || '0')}`, 20, 80);
+    doc.text(`Rentabilidad: Bs. ${formatNumberVE(document.querySelector('[data-metrica="rentabilidad"]')?.textContent || '0')}`, 20, 90);
+
+    // Top Categorías
+    doc.setFontSize(14);
+    doc.text('Top 5 Categorías de Gasto', 20, 110);
+    doc.setFontSize(12);
+    let y = 120;
+    Array.from(document.querySelectorAll('#contenedorReporte ul li')).forEach(li => {
+        doc.text(li.textContent, 20, y);
+        y += 10;
+    });
+
+    // Comparativa Mensual
+    doc.setFontSize(14);
+    doc.text('Comparativa Mensual', 20, y + 20);
+    doc.setFontSize(12);
+    y += 30;
+    Array.from(document.querySelectorAll('#contenedorReporte table tbody tr')).forEach(tr => {
+        const celdas = Array.from(tr.querySelectorAll('td'));
+        doc.text(`${celdas[0].textContent} | ${celdas[1].textContent} | ${celdas[2].textContent} | ${celdas[3].textContent}`, 20, y);
+        y += 10;
+    });
+
+    // Descargar el archivo
+    doc.save('Reporte_Gerencial.pdf');
+    mostrarToast('✅ Reporte exportado a PDF', 'success');
+}
+
+/* - Función para mostrar ayuda de Reportes Gerenciales - */
+function mostrarAyudaReportes() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">📊 Guía de Reportes Gerenciales</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Configurar reportes:</strong> Selecciona el período y las métricas que deseas incluir.</li>
+                <li><strong>Generar reportes:</strong> Obten un resumen visual de tus finanzas por mes o trimestre.</li>
+                <li><strong>Exportar reportes:</strong> Genera archivos en Excel o PDF para compartir o archivar.</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa esta herramienta para presentar información financiera a directivos o para tomar decisiones estratégicas basadas en datos.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaReportes');
+}
+
+// =========================================================
+// ✅ SISTEMA DE ASISTENTE FINANCIERO (CRUD - Create, Read, Update, Delete)
+// =========================================================
+
+/* - CRUD - */
+async function addReglaAsistente(regla) {
+    return addEntry(STORES.ASISTENTE, regla);
+}
+
+async function getAllReglasAsistente() {
+    return getAllEntries(STORES.ASISTENTE);
+}
+
+async function updateReglaAsistente(regla) {
+    return updateEntry(STORES.ASISTENTE, regla);
+}
+
+async function deleteReglaAsistente(id) {
+    return deleteEntry(STORES.ASISTENTE, id);
+}
+
+/* - Función para renderizar las reglas del asistente - */
+async function renderizarReglasAsistente() {
+    const reglas = await getAllReglasAsistente();
+    const select = document.getElementById('reglaCategoria');
+
+    // Actualizar el select de categorías del asistente
+    await actualizarSelectCategoriasAsistente();
+
+    if (reglas.length === 0) {
+        document.getElementById('contenedorSugerencias').innerHTML = '<p style="text-align: center; color: var(--text-light);">No hay reglas definidas para el asistente.</p>';
+        return;
+    }
+
+    let html = '';
+    reglas.forEach(regla => {
+        html += `
+            <div class="tarjeta-regla" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow-sm); transition: transform 0.2s; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0; color: var(--text);">${regla.palabraClave}</h4>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button onclick="editarReglaAsistente(${regla.id})" title="Editar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">✏️</button>
+                        <button onclick="eliminarReglaAsistente(${regla.id})" title="Eliminar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">🗑️</button>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">🏷️ ${regla.categoria}</span>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">🔔 ${regla.accion}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    document.getElementById('contenedorSugerencias').innerHTML = html;
+}
+
+/* - Función para agregar una regla del asistente - */
+async function agregarReglaAsistente() {
+    const palabraClave = document.getElementById('reglaPalabraClave').value.trim();
+    const categoria = document.getElementById('reglaCategoria').value;
+    const accion = document.getElementById('reglaAccion').value;
+
+    if (!palabraClave || !categoria || !accion) {
+        mostrarToast('❌ Todos los campos son obligatorios', 'danger');
+        return;
+    }
+
+    // Si la categoría no existe, créala
+    const categorias = await getAllCategoriasAsistente();
+    const categoriaExistente = categorias.find(c => c.nombre === categoria);
+
+    if (!categoriaExistente) {
+        await addCategoriaAsistente({ nombre: categoria });
+        // Actualizar el select después de crear la categoría
+        await actualizarSelectCategoriasAsistente();
+    }
+
+    const regla = {
+        palabraClave,
+        categoria,
+        accion,
+        fechaCreacion: new Date().toISOString()
+    };
+
+    try {
+        await addReglaAsistente(regla);
+        mostrarToast('✅ Regla agregada', 'success');
+        limpiarFormularioRegla();
+        await renderizarReglasAsistente(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al agregar la regla:", error);
+        mostrarToast('❌ Error al agregar la regla', 'danger');
+    }
+}
+
+/* - Función para editar una regla del asistente - */
+async function editarReglaAsistente(id) {
+    const reglas = await getAllReglasAsistente();
+    const regla = reglas.find(r => r.id === id);
+
+    if (!regla) return;
+
+    document.getElementById('reglaPalabraClave').value = regla.palabraClave;
+    document.getElementById('reglaCategoria').value = regla.categoria;
+    document.getElementById('reglaAccion').value = regla.accion;
+
+    // Cambiar el texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-asistente-financiero button[onclick="agregarReglaAsistente()"]');
+    if (btnGuardar) btnGuardar.textContent = 'Actualizar Regla';
+
+    // Desplazar hacia el formulario
+    document.getElementById('configuracionAsistente').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* - Función para eliminar una regla del asistente - */
+async function eliminarReglaAsistente(id) {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta regla?')) return;
+
+    try {
+        await deleteReglaAsistente(id);
+        mostrarToast('✅ Regla eliminada', 'success');
+        await renderizarReglasAsistente(); // Recargar la lista
+    } catch (error) {
+        console.error("Error al eliminar la regla:", error);
+        mostrarToast('❌ Error al eliminar la regla', 'danger');
+    }
+}
+
+/* - Función para limpiar el formulario - */
+function limpiarFormularioRegla() {
+    document.getElementById('reglaPalabraClave').value = '';
+    document.getElementById('reglaCategoria').value = '';
+    document.getElementById('reglaAccion').value = 'sugerirAhorro';
+    // Restaurar texto del botón (opcional)
+    const btnGuardar = document.querySelector('#side-asistente-financiero button[onclick="agregarReglaAsistente()"]');
+    if (btnGuardar) btnGuardar.textContent = '➕ Agregar Regla';
+}
+
+/* - Función para mostrar ayuda de Asistente Financiero - */
+function mostrarAyudaAsistenteFinanciero() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">💡 Guía de Asistente Financiero</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Funcionalidades:</h3>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Definir reglas:</strong> Crea reglas basadas en palabras clave y categorías.</li>
+                <li><strong>Sugerir acciones:</strong> El asistente sugerirá acciones automáticas como ahorrar, alertar o recomendar cambios.</li>
+                <li><strong>Historial de acciones:</strong> Revisa las acciones que el asistente ha sugerido.</li>
+            </ul>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa esta herramienta para automatizar decisiones financieras y mejorar la eficiencia de tu negocio.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalAyudaAsistenteFinanciero');
+}
+
+/* - Función para mostrar un ejemplo de uso del Asistente Financiero - */
+function mostrarEjemploAsistente() {
+    const contenido = `
+        <h2 style="color:var(--primary); margin-bottom:1.5rem; text-align:center;">🎯 Ejemplo de Uso: Gasto Alto en Servicios</h2>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Paso 1: Configurar la Regla</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">En la sección de configuración, agrega una regla con:</p>
+            <ul style="color:var(--text-light); line-height:1.6; margin:0; padding-left:1.5rem;">
+                <li><strong>Palabra clave:</strong> <code>servicios</code></li>
+                <li><strong>Categoría objetivo:</strong> <code>Servicios</code></li>
+                <li><strong>Acción sugerida:</strong> <code>Alertar por gasto alto</code></li>
+            </ul>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Paso 2: El Asistente Detecta el Problema</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">Cuando registres un movimiento con concepto <code>Pago de electricidad</code> y categoría <code>Servicios</code>, el asistente lo detectará y te alertará si el gasto es mayor a lo habitual.</p>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Paso 3: Recibir la Sugerencia</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">En la sección <strong>"Sugerencias del Asistente"</strong>, verás una tarjeta con la alerta y una sugerencia de acción: <em>"Revisar contratos de servicios para negociar precios más bajos"</em>.</p>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Paso 4: Tomar Acción</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">Haz clic en la tarjeta de la sugerencia para ir a la pestaña "Movimientos" y filtrar los gastos de la categoría "Servicios". Revisa tus facturas y toma decisiones informadas.</p>
+        </div>
+        <div style="margin-bottom:1.5rem;">
+            <h3 style="color:var(--text); margin-bottom:0.75rem;">✅ Paso 5: Historial de Acciones</h3>
+            <p style="color:var(--text-light); line-height:1.6; margin:0 0 1rem 0;">En la sección <strong>"Historial de Acciones"</strong>, verás registrado el evento y el resultado: <em>"Gasto reducido en 20% el siguiente mes"</em>.</p>
+        </div>
+        <div style="background:var(--info-bg); padding:1rem; border-radius:8px; border-left:4px solid var(--info); margin-top:1.5rem;">
+            <p style="margin:0; color:var(--info-text); font-size:0.875rem;"><strong>💡 Consejo:</strong> Usa esta herramienta para automatizar la detección de problemas financieros y mejorar la eficiencia de tu negocio.</p>
+        </div>
+    `;
+    mostrarModalAyuda(contenido, 'modalEjemploAsistente');
+}
+
+// =========================================================
+// ✅ SISTEMA DE CATEGORÍAS DEL ASISTENTE FINANCIERO (CRUD)
+// =========================================================
+
+/* - CRUD - */
+async function addCategoriaAsistente(categoria) {
+    return addEntry(STORES.CATEGORIAS_ASISTENTE, categoria);
+}
+
+async function getAllCategoriasAsistente() {
+    return getAllEntries(STORES.CATEGORIAS_ASISTENTE);
+}
+
+async function updateCategoriaAsistente(categoria) {
+    return updateEntry(STORES.CATEGORIAS_ASISTENTE, categoria);
+}
+
+async function deleteCategoriaAsistente(id) {
+    return deleteEntry(STORES.CATEGORIAS_ASISTENTE, id);
+}
+
+/* - Función para actualizar el select de categorías del asistente - */
+async function actualizarSelectCategoriasAsistente() {
+    const select = document.getElementById('reglaCategoria');
+    const mostrarTodas = document.getElementById('mostrarTodasCategorias').checked;
+
+    // Limpiar el select
+    select.innerHTML = '<option value="">Selecciona una categoría</option>';
+
+    if (mostrarTodas) {
+        // Mostrar todas las categorías del sistema
+        const categorias = await getAllEntries(STORES.CATEGORIAS);
+        categorias.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat.nombre;
+            opt.textContent = cat.nombre;
+            select.appendChild(opt);
+        });
+    } else {
+        // Mostrar solo las categorías del asistente
+        const categorias = await getAllCategoriasAsistente();
+        categorias.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat.nombre;
+            opt.textContent = cat.nombre;
+            select.appendChild(opt);
+        });
+    }
+
+    // Si hay una categoría seleccionada, intentar mantenerla
+    const categoriaActual = select.value;
+    if (categoriaActual && !select.querySelector(`option[value="${categoriaActual}"]`)) {
+        select.value = '';
+    }
+}
+
+/* - Función para alternar la visibilidad de la sección de ajustes - */
+function toggleAjustesAsistente() {
+    const seccion = document.getElementById('seccionAjustes');
+    const flecha = document.getElementById('flechaAjustes');
+
+    if (seccion.style.display === 'none') {
+        seccion.style.display = 'block';
+        flecha.style.transform = 'rotate(180deg)';
+    } else {
+        seccion.style.display = 'none';
+        flecha.style.transform = 'rotate(0deg)';
+    }
+
+    // ✅ Guardar el estado del checkbox en localStorage
+    const mostrarTodas = document.getElementById('mostrarTodasCategorias').checked;
+    localStorage.setItem('mostrarTodasCategorias', mostrarTodas);
+}
+
+// ✅ Event listener para guardar el estado del checkbox inmediatamente
+document.addEventListener('DOMContentLoaded', function() {
+    const checkbox = document.getElementById('mostrarTodasCategorias');
+    if (checkbox) {
+        checkbox.addEventListener('change', function() {
+            // Guardar el estado en localStorage
+            localStorage.setItem('mostrarTodasCategorias', this.checked);
+            // Actualizar el select
+            actualizarSelectCategoriasAsistente();
+        });
+    }
+});
+
+// ✅ Función para alternar la visibilidad de la sección de widgets
+function toggleWidgets() {
+  const contenido = document.getElementById('contenidoWidgets');
+  const flecha = document.getElementById('flechaWidgets');
+
+  if (contenido.style.maxHeight === '0px' || contenido.style.maxHeight === '') {
+    // Mostrar el contenido
+    contenido.style.maxHeight = '500px'; // Altura máxima para la animación
+    contenido.style.opacity = '1';
+    flecha.style.transform = 'rotate(180deg)';
+  } else {
+    // Ocultar el contenido
+    contenido.style.maxHeight = '0px';
+    contenido.style.opacity = '0';
+    flecha.style.transform = 'rotate(0deg)';
+  }
+
+  // Guardar el estado en localStorage
+  localStorage.setItem('widgetsVisible', contenido.style.maxHeight !== '0px');
+}
+
+// ✅ Función para cargar el estado de los widgets al iniciar la app
+function cargarEstadoWidgets() {
+  const estado = localStorage.getItem('widgetsVisible');
+  if (estado === 'true') {
+    const contenido = document.getElementById('contenidoWidgets');
+    const flecha = document.getElementById('flechaWidgets');
+    contenido.style.maxHeight = '500px';
+    contenido.style.opacity = '1';
+    flecha.style.transform = 'rotate(180deg)';
+  }
+}
+
+// ===============================
+// 🔔 SISTEMA DE NOTIFICACIONES (TOASTS) Y RECORDATORIOS
+// ===============================
+
+// Crear el contenedor si no existe
+if (!document.getElementById("toast-container")) {
+  const toastContainer = document.createElement("div");
+  toastContainer.id = "toast-container";
+  document.body.appendChild(toastContainer);
+}
+
+// Función para mostrar el toast
+function showToast(message, type = "info") {
+  const toastContainer = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `custom-toast ${type}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+
+  // Animar aparición
+  setTimeout(() => toast.classList.add("show"), 100);
+
+  // Desaparecer después de 5 segundos
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+// ===============================
+// ⏰ MONITOREO DE RECORDATORIOS
+// ===============================
+function startReminderWatcher() {
+  setInterval(async () => {
+    try {
+      const tx = db.transaction(["recordatorios"], "readonly");
+      const store = tx.objectStore("recordatorios");
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const recordatorios = request.result;
+        const now = new Date();
+
+        recordatorios.forEach(rec => {
+          if (!rec || !rec.fecha || rec.notificado) return;
+
+          const fecha = new Date(rec.fecha);
+          if (now >= fecha) {
+            // Marcar como notificado
+            const tx2 = db.transaction(["recordatorios"], "readwrite");
+            const store2 = tx2.objectStore("recordatorios");
+            rec.notificado = true;
+            store2.put(rec);
+
+            // Mostrar toast
+            showToast(`🔔 Recordatorio: ${rec.titulo || "Sin título"}`, "info");
+
+          }
+        });
+      };
+    } catch (error) {
+      console.error("Error comprobando recordatorios:", error);
+    }
+  }, 30000); // ✅ cada 30 segundos
+}
+
+// Iniciar el monitoreo
+document.addEventListener("DOMContentLoaded", startReminderWatcher);
+
+// 🧹 Reset automático de fechas al cargar la pestaña "Presupuesto sugerido"
+document.addEventListener("DOMContentLoaded", () => {
+  const fDesde = document.getElementById("fechaDesdePresupuesto");
+  const fHasta = document.getElementById("fechaHastaPresupuesto");
+
+  if (fDesde) {
+    fDesde.value = "";
+    fDesde.setAttribute("autocomplete", "off");
+  }
+  if (fHasta) {
+    fHasta.value = "";
+    fHasta.setAttribute("autocomplete", "off");
+  }
+});
+
+// ===============================
+// ✅ NAVEGACIÓN CON ENTER EN FORMULARIOS
+// ===============================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Función auxiliar para encontrar el siguiente elemento enfocable
+    function findNextFocusableElement(currentElement) {
+        const allElements = Array.from(document.querySelectorAll('input, select, textarea, button'));
+        const currentIndex = allElements.indexOf(currentElement);
+        if (currentIndex === -1) return null;
+
+        for (let i = currentIndex + 1; i < allElements.length; i++) {
+            const el = allElements[i];
+            if (!el.disabled && !el.hidden && el.offsetParent !== null) {
+                return el;
+            }
+        }
+        return null;
+    }
+
+    // Función para manejar el evento Enter en un campo
+    function handleEnterKey(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Evita el comportamiento por defecto (enviar formulario)
+            const nextElement = findNextFocusableElement(event.target);
+            if (nextElement) {
+                nextElement.focus();
+                // Si es un input de tipo texto, selecciona todo su contenido para facilitar la edición
+                if (nextElement.tagName === 'INPUT' && nextElement.type === 'text') {
+                    nextElement.select();
+                }
+            }
+        }
+    }
+
+    // Aplicar a los campos del formulario de MOVIMIENTOS
+    const movimientoFields = [
+        document.getElementById('concepto'),
+        document.getElementById('cantidad'),
+        document.getElementById('fechaMov'),
+        document.getElementById('categoria'),
+        document.getElementById('banco'),
+        document.getElementById('nuevaCategoria'),
+        document.getElementById('nuevoBanco')
+    ];
+
+    movimientoFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de AHORRO (Nueva Meta)
+    const ahorroFields = [
+        document.getElementById('nombreMeta'),
+        document.getElementById('montoMeta')
+    ];
+
+    ahorroFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de INVERSIONES
+    const inversionesFields = [
+        document.getElementById('activoInversion'),
+        document.getElementById('cantidadInvertida'),
+        document.getElementById('fechaInversion')
+    ];
+
+    inversionesFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de RECORDATORIOS
+    const recordatoriosFields = [
+        document.getElementById('tituloRecordatorio'),
+        document.getElementById('descripcionRecordatorio'),
+        document.getElementById('fechaRecordatorio'),
+        document.getElementById('prioridadRecordatorio'),
+        document.getElementById('repeticionRecordatorio')
+    ];
+
+    recordatoriosFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de CONFIGURACIÓN (Reglas)
+    const reglasFields = [
+        document.getElementById('txtPalabra'),
+        document.getElementById('txtCat'),
+        document.getElementById('txtBancoRegla'),
+        document.getElementById('nuevoBancoRegla')
+    ];
+
+    reglasFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de ACTIVOS/INVENTARIO (si existe)
+    const activosFields = [
+        document.getElementById('nombreActivo'),
+        document.getElementById('valorActivo'),
+        document.getElementById('fechaCompra'),
+        document.getElementById('depreciacionEstimada'),
+        document.getElementById('descripcionActivo'),
+        document.getElementById('categoriaActivo')
+    ];
+
+    activosFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+
+    // Aplicar a los campos del formulario de PRESUPUESTO SUGERIDO (si aplica)
+    const presupuestoFields = [
+        document.getElementById('presupuestoMonto'),
+        document.getElementById('fechaInicioPresupuesto'),
+        document.getElementById('fechaFinPresupuesto')
+    ];
+
+    presupuestoFields.forEach(field => {
+        if (field) {
+            field.addEventListener('keypress', handleEnterKey);
+        }
+    });
+});
+
+// ===============================
+// ✅ FUNCIÓN PARA IMPRIMIR UN PRESUPUESTO INDIVIDUAL
+// ===============================
+function imprimirPresupuestoIndividual(indice) {
+    const historialRaw = localStorage.getItem('historialPresupuestos');
+    if (!historialRaw) {
+        mostrarToast('No hay historial disponible.', 'info');
+        return;
+    }
+
+    let historial;
+    try {
+        historial = JSON.parse(historialRaw);
+    } catch (e) {
+        console.error('Error al parsear el historial:', e);
+        mostrarToast('Error al cargar el historial para imprimir.', 'danger');
+        return;
+    }
+
+    if (!historial || historial.length === 0 || indice < 0 || indice >= historial.length) {
+        mostrarToast('El cálculo seleccionado no existe.', 'warning');
+        return;
+    }
+
+    const item = historial[indice];
+    const fecha = new Date(item.fecha).toLocaleString('es-VE', {
+        dateStyle: 'full',
+        timeStyle: 'short'
+    });
+
+    // Obtener categorías solo del item
+    let categoriasTexto = '—';
+    if (item.categorias && Array.isArray(item.categorias) && item.categorias.length > 0) {
+        categoriasTexto = item.categorias.join(', ');
+    }
+
+    // Generar el contenido HTML para imprimir
+    const contenidoHTML = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Presupuesto Sugerido - ${fecha}</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    background: white;
+                }
+                h1 {
+                    text-align: center;
+                    color: #2c3e50;
+                    border-bottom: 2px solid #3498db;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                }
+                .presupuesto-item {
+                    background: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 15px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                .presupuesto-header {
+                    font-weight: bold;
+                    color: #2c3e50;
+                    margin-bottom: 10px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .resumen-texto {
+                    white-space: pre-wrap;
+                    background: #f1f3f5;
+                    padding: 10px;
+                    border-radius: 6px;
+                    font-family: inherit;
+                    font-size: 0.95rem;
+                }
+                @media print {
+                    body {
+                        background: white !important;
+                        color: black !important;
+                        margin: 0;
+                        padding: 20px;
+                    }
+                    .presupuesto-item {
+                        box-shadow: none;
+                        border: 1px solid #ccc;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>📋 Presupuesto Sugerido</h1>
+            <div class="presupuesto-item">
+                <div class="presupuesto-header">
+                    <span>${fecha}</span>
+                    <span>Categorías: ${categoriasTexto}</span>
+                </div>
+                <div class="resumen-texto">${item.textoResumen ? item.textoResumen.replace(/\n/g, '<br>') : 'No hay información disponible.'}</div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(contenidoHTML);
+    printWindow.document.close();
+
+    printWindow.onload = function() {
+        printWindow.print();
+    };
+}
+
+// ✅ FUNCIÓN PARA IMPRIMIR EL HISTORIAL DE PRESUPUESTOS SUGERIDOS
+// ===============================
+function imprimirHistorialPresupuestos() {
+    const historialRaw = localStorage.getItem('historialPresupuestos');
+    if (!historialRaw) {
+        mostrarToast('No hay historial para imprimir.', 'info');
+        return;
+    }
+
+    let historial;
+    try {
+        historial = JSON.parse(historialRaw);
+    } catch (e) {
+        console.error('Error al parsear el historial:', e);
+        mostrarToast('Error al cargar el historial para imprimir.', 'danger');
+        return;
+    }
+
+    if (!historial || historial.length === 0) {
+        mostrarToast('No hay datos en el historial para imprimir.', 'info');
+        return;
+    }
+
+    // Ordenar por fecha (más reciente primero)
+    historial.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    // Generar el contenido HTML para imprimir
+    const contenidoHTML = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <title>Historial de Presupuestos Sugeridos</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    background: white;
+                }
+                h1 {
+                    text-align: center;
+                    color: #2c3e50;
+                    border-bottom: 2px solid #3498db;
+                    padding-bottom: 10px;
+                    margin-bottom: 20px;
+                }
+                .presupuesto-item {
+                    background: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 15px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                .presupuesto-header {
+                    font-weight: bold;
+                    color: #2c3e50;
+                    margin-bottom: 5px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .presupuesto-details {
+                    margin-top: 10px;
+                    padding-left: 10px;
+                    font-size: 0.95rem;
+                }
+                .detail-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 5px 0;
+                }
+                .label {
+                    font-weight: 600;
+                    color: #555;
+                }
+                .value {
+                    font-weight: 500;
+                    color: #333;
+                }
+                .resumen-texto {
+                    white-space: pre-wrap;
+                    background: #f1f3f5;
+                    padding: 10px;
+                    border-radius: 6px;
+                    font-family: inherit;
+                    font-size: 0.95rem;
+                }
+                .total-footer {
+                    margin-top: 30px;
+                    padding-top: 15px;
+                    border-top: 2px solid #eee;
+                    text-align: center;
+                    font-size: 0.9rem;
+                    color: #777;
+                }
+                @media print {
+                    body {
+                        background: white !important;
+                        color: black !important;
+                        margin: 0;
+                        padding: 20px;
+                    }
+                    .presupuesto-item {
+                        box-shadow: none;
+                        border: 1px solid #ccc;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>📋 Historial de Presupuestos Sugeridos</h1>
+            ${historial.map(item => {
+                const fecha = new Date(item.fecha).toLocaleString('es-VE', {
+                    dateStyle: 'full',
+                    timeStyle: 'short'
+                });
+
+                // --- NUEVO FORMATO ---
+                if (item.textoResumen) {
+                    // Obtener categorías solo del item (no usar fallback de localStorage)
+                    let categoriasTexto = '—';
+                    if (item.categorias && Array.isArray(item.categorias) && item.categorias.length > 0) {
+                        categoriasTexto = item.categorias.join(', ');
+                    }
+                    
+                    return `
+                        <div class="presupuesto-item">
+                            <div class="presupuesto-header">
+                                <span>${fecha}</span>
+                                <span>Categorías: ${categoriasTexto}</span>
+                            </div>
+                            <div class="presupuesto-details">
+                                <div class="resumen-texto">${item.textoResumen.replace(/\n/g, '<br>')}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // --- FORMATO ANTIGUO (compatibilidad) ---
+                const categorias = item.categorias ? item.categorias.join(', ') : 'Todas';
+                const totalGastos = item.totalGastos !== undefined ? formatNumberVE(item.totalGastos) : 'N/A';
+                const promedio = item.promedioDiario !== undefined ? formatNumberVE(item.promedioDiario)
+                                : (item.promedioGastos !== undefined ? formatNumberVE(item.promedioGastos) : 'N/A');
+                const inicial = item.presupuestoInicial !== undefined ? formatNumberVE(item.presupuestoInicial) : 'N/A';
+                const sugerido = item.presupuestoSugerido !== undefined ? formatNumberVE(item.presupuestoSugerido)
+                                : (item.presupuestoParaGastos !== undefined ? formatNumberVE(item.presupuestoParaGastos) : 'N/A');
+                const restante = item.restante !== undefined ? formatNumberVE(item.restante)
+                                : (inicial !== 'N/A' && sugerido !== 'N/A' ? formatNumberVE(inicial - sugerido) : 'N/A');
+
+                return `
+                    <div class="presupuesto-item">
+                        <div class="presupuesto-header">
+                            <span>${fecha}</span>
+                            <span>Categorías: ${categorias}</span>
+                        </div>
+                        <div class="presupuesto-details">
+                            <div class="detail-row"><span class="label">Total Gastos:</span><span class="value">${totalGastos} Bs</span></div>
+                            <div class="detail-row"><span class="label">Promedio Mensual:</span><span class="value">${promedio} Bs</span></div>
+                            <div class="detail-row"><span class="label">Presupuesto Inicial:</span><span class="value">${inicial} Bs</span></div>
+                            <div class="detail-row"><span class="label">Presupuesto Sugerido:</span><span class="value">${sugerido} Bs</span></div>
+                            <div class="detail-row"><span class="label">Restante:</span><span class="value">${restante} Bs</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+            <div class="total-footer">
+                Este documento fue generado automáticamente por tu sistema financiero personal.
+            </div>
+        </body>
+        </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(contenidoHTML);
+    printWindow.document.close();
+
+    printWindow.onload = function() {
+        printWindow.print();
+    };
+}
+
 
 // ------------------------------------------------------------------------------------------------------------------------------------
 //                                 Inicialización y Event Listeners
@@ -2916,17 +11018,24 @@ document.addEventListener('DOMContentLoaded', async function () {
         await cargarSelectEliminarCategorias();
         await cargarSelectEliminarBancos();
         await cargarSelectBancoRegla();
-
-        // Renderizar la información inicial en la interfaz
-        await renderizar();
-        await renderizarResumenBancos();
-        await renderizarReglas();
+        
+        // ✅ Cargar selector de empresas (Sistema Multi-Empresa)
 
          // Cargar meta de presupuesto y actualizar
         await cargarMetaPresupuesto();
 
         // Aplicar el tema guardado
         aplicarTemaInicial();
+
+        // Cargar estado de los widgets
+        cargarEstadoWidgets();
+
+        // ✅ INICIALIZAR SISTEMA MULTI-EMPRESA
+        await cargarEmpresaActiva();
+        await crearEmpresaPorDefecto();
+        await renderizarEmpresas();
+        await actualizarSelectorEmpresas();
+        actualizarSelectorEmpresaActiva();
 
         // Asignar Event Listeners
         document.getElementById('tasaCambio').addEventListener('input', actualizarEquivalente);
@@ -2939,6 +11048,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         } else {
             document.getElementById('tasaCambio').value = ''; // Vacío por defecto
         }
+
+        // 4.  🔐  SEGURIDAD: si el bloqueo está activo → mostrar modal
+    //     Esto se ejecuta SIEMPRE al recargar (F5, Ctrl+R, botón Recargar…)
+    if (localStorage.getItem('bloqueoActivo') === 'true' && localStorage.getItem('bloqueoPIN')) {
+      localStorage.removeItem('bloqueoDesbloqueado'); // fuerza bloqueo
+      mostrarModalBloqueo();
+    }
 
         // ✅ Inicializar equivalente al cargar
         actualizarEquivalente();
@@ -2984,56 +11100,528 @@ document.addEventListener('DOMContentLoaded', async function () {
         await renderizarBancosEditables();
 
         // Cargar la pestaña guardada, si existe
-        const pestañaGuardada = localStorage.getItem('agendaPestañaActiva');
-        if (pestañaGuardada) {
-            mostrarSideTab(pestañaGuardada);
-        } else {
-            mostrarSideTab('dashboard'); // ← Cambia esto por:
-            // mostrarSideTab('dashboard');
-            // Añadimos la nueva pestaña como predeterminada si no hay guardada
-            mostrarSideTab('dashboard');
-
-                    // ✅ Renderizar calendario si se abre la pestaña
-            if (pestañaGuardada === 'calendario') {
-            renderizarCalendario();
-            }
-        }
-
-                // ✅ Escuchar cambios de pestaña para renderizar calendario cuando se active
-            document.querySelectorAll('.side-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-            const id = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
-            if (id === 'calendario') {
-                renderizarCalendario();
-            }
-            });
-        });
-
-            // ✅ Cargar la calculadora de ahorro al abrir la pestaña
-            document.querySelectorAll('.side-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const id = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
-                    if (id === 'ahorro') {
-                        calcularAhorroMensual();
-                }
-            });
-        });
-
-            // ✅ Renderizar comparación de bancos al abrir la pestaña
-            document.querySelectorAll('.side-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
-                const id = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
-                if (id === 'comparacion') {
-                renderizarComparacionBancos();
-                }
-        });
-    });
-
+const pestañaGuardada = localStorage.getItem('agendaPestañaActiva');
+if (pestañaGuardada) {
+    mostrarSideTab(pestañaGuardada);
+} else {
+    mostrarSideTab('dashboard');
 }
-    
-    
-    catch (error) {
-        console.error("Error en la inicialización de la app:", error);
-    }
+
+} catch (error) {
+    console.error("Error en la inicialización de la app:", error);
+}
 
 });
+
+// ✅ Inicialización de metas de ahorro
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar metas de ahorro cuando se carga la página
+    setTimeout(() => {
+        cargarMetasAhorro();
+        actualizarProgresoGeneral();
+        generarSugerenciasAhorro();
+    }, 1000); // Pequeño delay para asegurar que todo esté cargado
+});
+
+// =========================================================
+// ✅ SISTEMA DE GESTIÓN DE EMPRESAS (Sistema Multi-Empresa)
+// =========================================================
+
+/* - CRUD de Empresas - */
+async function addEmpresa(empresa) {
+    return addEntry(STORES.EMPRESAS, empresa);
+}
+
+async function getAllEmpresas() {
+    return getAllEntries(STORES.EMPRESAS);
+}
+
+async function getEmpresa(id) {
+    return getEntry(STORES.EMPRESAS, id);
+}
+
+async function updateEmpresa(empresa) {
+    return updateEntry(STORES.EMPRESAS, empresa);
+}
+
+async function deleteEmpresa(id) {
+    return deleteEntry(STORES.EMPRESAS, id);
+}
+
+/* - Funciones de gestión de empresas - */
+
+// ✅ Variable global para la empresa activa
+let empresaActiva = null;
+
+// ✅ Función para obtener la empresa activa
+function getEmpresaActiva() {
+    return empresaActiva;
+}
+
+// ✅ Función para establecer la empresa activa
+function setEmpresaActiva(empresa) {
+    empresaActiva = empresa;
+    localStorage.setItem('empresaActivaId', empresa ? empresa.id : null);
+    localStorage.setItem('empresaActivaNombre', empresa ? empresa.nombre : 'Todas');
+    
+    // Actualizar UI
+    actualizarSelectorEmpresaActiva();
+    
+    // Recargar datos con el filtro de empresa
+    if (typeof renderizar === 'function') {
+        renderizar();
+    }
+}
+
+// ✅ Función para cargar empresa activa desde localStorage
+async function cargarEmpresaActiva() {
+    const empresaActivaId = localStorage.getItem('empresaActivaId');
+    if (empresaActivaId) {
+        try {
+            const empresa = await getEmpresa(parseInt(empresaActivaId));
+            if (empresa) {
+                empresaActiva = empresa;
+            } else {
+                // Si no existe la empresa, limpiar localStorage
+                localStorage.removeItem('empresaActivaId');
+                localStorage.removeItem('empresaActivaNombre');
+                empresaActiva = null;
+            }
+        } catch (error) {
+            console.error('Error cargando empresa activa:', error);
+            empresaActiva = null;
+        }
+    }
+}
+
+// ✅ Función para renderizar empresas en la interfaz
+async function renderizarEmpresas() {
+    const empresas = await getAllEmpresas();
+    const contenedor = document.getElementById('contenedorEmpresas');
+    
+    if (!contenedor) return;
+    
+    if (empresas.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: var(--text-light);">No hay empresas registradas.</p>';
+        return;
+    }
+    
+    let html = '';
+    empresas.forEach(empresa => {
+        const esActiva = empresaActiva && empresaActiva.id === empresa.id;
+        
+        // Procesar el logo (base64 o ruta local)
+        let logoHtml = '';
+        if (empresa.logo) {
+            let logoSrc = '';
+            if (empresa.logo.startsWith('data:')) {
+                logoSrc = empresa.logo; // Base64
+            } else {
+                logoSrc = empresa.logo; // Ruta local
+            }
+            logoHtml = `
+                <div style="text-align: center; margin-bottom: 0.75rem;">
+                    <img src="${logoSrc}" style="max-height: 60px; max-width: 120px; object-fit: contain; border-radius: 4px;" alt="Logo de ${empresa.nombre}" onerror="this.style.display='none';">
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="tarjeta-empresa" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow-sm); transition: transform 0.2s; cursor: pointer; ${esActiva ? 'border: 2px solid var(--primary);' : ''}">
+                ${logoHtml}
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                    <h4 style="margin: 0; color: var(--text);">${empresa.nombre}</h4>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button onclick="editarEmpresa(${empresa.id})" title="Editar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">✏️</button>
+                        <button onclick="eliminarEmpresa(${empresa.id})" title="Eliminar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">🗑️</button>
+                        <button onclick="seleccionarEmpresa(${empresa.id})" title="Seleccionar" style="background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;">${esActiva ? '✅' : '👁️'}</button>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">📋 RIF: ${empresa.rif || 'N/A'}</span>
+                    <span style="color: var(--text-light); font-size: 0.9rem;">📞 ${empresa.telefono || 'N/A'}</span>
+                </div>
+                ${empresa.direccion ? `<p style="color: var(--text-light); font-size: 0.8rem; margin: 0.25rem 0;">📍 ${empresa.direccion}</p>` : ''}
+                ${empresa.sector ? `<p style="color: var(--text-light); font-size: 0.8rem; margin: 0.25rem 0;">🏭 ${empresa.sector}</p>` : ''}
+            </div>
+        `;
+    });
+    
+    contenedor.innerHTML = html;
+}
+
+// ✅ Función para agregar una nueva empresa
+async function agregarEmpresa() {
+    const nombre = document.getElementById('empresaNombre').value.trim();
+    const rif = document.getElementById('empresaRif').value.trim();
+    const telefono = document.getElementById('empresaTelefono').value.trim();
+    const direccion = document.getElementById('empresaDireccion').value.trim();
+    const sector = document.getElementById('empresaSector').value.trim();
+    
+    if (!nombre) {
+        mostrarToast('❌ El nombre de la empresa es obligatorio', 'danger');
+        return;
+    }
+    
+    // Procesar el logo si se seleccionó uno
+    let logoBase64 = '';
+    const logoFile = document.getElementById('empresaLogo').files[0];
+    
+    if (logoFile) {
+        logoBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(logoFile);
+        });
+    }
+    
+    // Verificar si ya existe una empresa con el mismo nombre o RIF
+    const empresas = await getAllEmpresas();
+    const empresaExistente = empresas.find(e => e.nombre.toLowerCase() === nombre.toLowerCase() || (rif && e.rif === rif));
+    
+    if (empresaExistente) {
+        mostrarToast('❌ Ya existe una empresa con ese nombre o RIF', 'danger');
+        return;
+    }
+    
+    const empresa = {
+        nombre,
+        rif,
+        telefono,
+        direccion,
+        sector,
+        logo: logoBase64,
+        fechaCreacion: new Date().toISOString()
+    };
+    
+    try {
+        await addEmpresa(empresa);
+        mostrarToast('✅ Empresa agregada correctamente', 'success');
+        limpiarFormularioEmpresa();
+        await renderizarEmpresas();
+        await actualizarSelectorEmpresas();
+    } catch (error) {
+        console.error('Error al agregar empresa:', error);
+        mostrarToast('❌ Error al agregar la empresa', 'danger');
+    }
+}
+
+// ✅ Función para editar una empresa
+async function editarEmpresa(id) {
+    const empresa = await getEmpresa(id);
+    if (!empresa) return;
+    
+    document.getElementById('empresaNombre').value = empresa.nombre || '';
+    document.getElementById('empresaRif').value = empresa.rif || '';
+    document.getElementById('empresaTelefono').value = empresa.telefono || '';
+    document.getElementById('empresaDireccion').value = empresa.direccion || '';
+    document.getElementById('empresaSector').value = empresa.sector || '';
+    
+    // Mostrar el logo existente si hay uno
+    if (empresa.logo) {
+        let logoSrc = '';
+        if (empresa.logo.startsWith('data:')) {
+            logoSrc = empresa.logo; // Base64
+        } else {
+            logoSrc = empresa.logo; // Ruta local
+        }
+        document.getElementById('vistaPreviaLogo').src = logoSrc;
+        document.getElementById('vistaPreviaLogoContainer').style.display = 'block';
+    } else {
+        // Limpiar la vista previa si no hay logo
+        document.getElementById('vistaPreviaLogoContainer').style.display = 'none';
+        document.getElementById('vistaPreviaLogo').src = '';
+    }
+    
+    // Cambiar el texto del botón
+    const btnGuardar = document.querySelector('#side-empresas button[onclick="agregarEmpresa()"]');
+    if (btnGuardar) {
+        btnGuardar.textContent = 'Actualizar Empresa';
+        btnGuardar.setAttribute('onclick', 'actualizarEmpresa(' + id + ')');
+    }
+    
+    // Hacer scroll al formulario
+    document.getElementById('formularioEmpresa').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ✅ Función para actualizar una empresa
+async function actualizarEmpresa(id) {
+    const nombre = document.getElementById('empresaNombre').value.trim();
+    const rif = document.getElementById('empresaRif').value.trim();
+    const telefono = document.getElementById('empresaTelefono').value.trim();
+    const direccion = document.getElementById('empresaDireccion').value.trim();
+    const sector = document.getElementById('empresaSector').value.trim();
+    
+    if (!nombre) {
+        mostrarToast('❌ El nombre de la empresa es obligatorio', 'danger');
+        return;
+    }
+    
+    const empresa = await getEmpresa(id);
+    if (!empresa) {
+        mostrarToast('❌ Empresa no encontrada', 'danger');
+        return;
+    }
+    
+    // Procesar el logo si se seleccionó uno nuevo
+    let logoActualizado = empresa.logo; // Mantener el logo existente por defecto
+    const logoFile = document.getElementById('empresaLogo').files[0];
+    
+    if (logoFile) {
+        // Hay un nuevo logo, procesarlo
+        logoActualizado = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(logoFile);
+        });
+    }
+    
+    // Actualizar datos
+    empresa.nombre = nombre;
+    empresa.rif = rif;
+    empresa.telefono = telefono;
+    empresa.direccion = direccion;
+    empresa.sector = sector;
+    empresa.logo = logoActualizado;
+    empresa.fechaActualizacion = new Date().toISOString();
+    
+    try {
+        await updateEmpresa(empresa);
+        mostrarToast('✅ Empresa actualizada correctamente', 'success');
+        limpiarFormularioEmpresa();
+        await renderizarEmpresas();
+        await actualizarSelectorEmpresas();
+        
+        // Restaurar botón a su estado original
+        const btnGuardar = document.querySelector('#side-empresas button[onclick^="actualizarEmpresa"]');
+        if (btnGuardar) {
+            btnGuardar.textContent = '➕ Agregar Empresa';
+            btnGuardar.setAttribute('onclick', 'agregarEmpresa()');
+        }
+    } catch (error) {
+        console.error('Error al actualizar empresa:', error);
+        mostrarToast('❌ Error al actualizar la empresa', 'danger');
+    }
+}
+
+// ✅ Función para eliminar una empresa
+async function eliminarEmpresa(id) {
+    if (!await mostrarConfirmacion('¿Estás seguro de que quieres eliminar esta empresa? Esta acción no se puede deshacer.')) {
+        return;
+    }
+    
+    try {
+        // Verificar si hay movimientos asociados
+        const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+        const movimientosAsociados = movimientos.filter(m => m.empresaId === id);
+        
+        if (movimientosAsociados.length > 0) {
+            const reasignar = await mostrarConfirmacion(
+                `Esta empresa tiene ${movimientosAsociados.length} movimientos asociados. ¿Qué deseas hacer?\n\n` +
+                `1. Eliminar empresa y sus movimientos\n` +
+                `2. Mantener movimientos sin asignar a ninguna empresa\n\n` +
+                `Haz clic en Aceptar para eliminar los movimientos, o Cancelar para mantenerlos.`
+            );
+            
+            if (!reasignar) {
+                // Opción 2: Eliminar solo la empresa, mantener movimientos sin empresa
+                await deleteEmpresa(id);
+                mostrarToast('✅ Empresa eliminada. Los movimientos ahora no tienen empresa asignada.', 'success');
+            } else {
+                // Opción 1: Eliminar empresa y sus movimientos
+                for (const movimiento of movimientosAsociados) {
+                    await deleteEntry(STORES.MOVIMIENTOS, movimiento.id);
+                }
+                await deleteEmpresa(id);
+                mostrarToast(`✅ Empresa y ${movimientosAsociados.length} movimientos eliminados.`, 'success');
+            }
+        } else {
+            // No hay movimientos asociados, eliminar directamente
+            await deleteEmpresa(id);
+            mostrarToast('✅ Empresa eliminada correctamente', 'success');
+        }
+        
+        // Si era la empresa activa, limpiar selección
+        if (empresaActiva && empresaActiva.id === id) {
+            setEmpresaActiva(null);
+        }
+        
+        await renderizarEmpresas();
+        await actualizarSelectorEmpresas();
+    } catch (error) {
+        console.error('Error al eliminar empresa:', error);
+        mostrarToast('❌ Error al eliminar la empresa', 'danger');
+    }
+}
+
+// ✅ Función para seleccionar una empresa como activa
+async function seleccionarEmpresa(id) {
+    const empresa = await getEmpresa(id);
+    if (empresa) {
+        setEmpresaActiva(empresa);
+        mostrarToast(`✅ Empresa "${empresa.nombre}" seleccionada como activa`, 'success');
+        await renderizarEmpresas();
+    }
+}
+
+// ✅ Función para limpiar el formulario de empresa
+function limpiarFormularioEmpresa() {
+    document.getElementById('empresaNombre').value = '';
+    document.getElementById('empresaRif').value = '';
+    document.getElementById('empresaTelefono').value = '';
+    document.getElementById('empresaDireccion').value = '';
+    document.getElementById('empresaSector').value = '';
+    
+    // Limpiar el logo
+    document.getElementById('empresaLogo').value = '';
+    document.getElementById('vistaPreviaLogoContainer').style.display = 'none';
+    document.getElementById('vistaPreviaLogo').src = '';
+}
+
+// ✅ Función para actualizar el selector de empresas en el formulario de movimientos
+async function actualizarSelectorEmpresas() {
+    const selector = document.getElementById('empresaMovimiento');
+    if (!selector) return;
+    
+    const empresas = await getAllEmpresas();
+    
+    // Limpiar selector
+    selector.innerHTML = '<option value="">Selecciona una empresa</option>';
+    
+    // Agregar empresas sin seleccionar ninguna por defecto
+    empresas.forEach(empresa => {
+        const option = document.createElement('option');
+        option.value = empresa.id;
+        option.textContent = empresa.nombre;
+        if (empresaActiva && empresaActiva.id === empresa.id) {
+            option.selected = true;
+        }
+        selector.appendChild(option);
+    });
+}
+
+// ✅ Función para actualizar el selector de empresa activa
+function actualizarSelectorEmpresaActiva() {
+    const selector = document.getElementById('selectorEmpresaActiva');
+    if (!selector) return;
+    
+    selector.innerHTML = `
+        <option value="">Todas las empresas</option>
+    `;
+    
+    if (empresaActiva) {
+        selector.innerHTML += `<option value="${empresaActiva.id}" selected>${empresaActiva.nombre}</option>`;
+    }
+}
+
+// ✅ Función para crear empresa por defecto y migrar movimientos existentes
+async function crearEmpresaPorDefecto() {
+    const empresas = await getAllEmpresas();
+    
+    if (empresas.length === 0) {
+        // Crear empresa por defecto
+        const empresaDefecto = {
+            nombre: 'Centro Médico Quirúrgico La Fe',
+            rif: 'J-06507063-3',
+            telefono: '295.4006000',
+            direccion: 'Av. Jovito Villalba - Isla de Margarita',
+            sector: 'Salud',
+            logo: 'recursos/logo/Empresas/La Fe.png', // Logo predefinido para la empresa principal
+            fechaCreacion: new Date().toISOString(),
+            esPorDefecto: true
+        };
+        
+        const id = await addEmpresa(empresaDefecto);
+        empresaDefecto.id = id;
+        
+        // Asignar todos los movimientos existentes a esta empresa
+        const movimientos = await getAllEntries(STORES.MOVIMIENTOS);
+        for (const movimiento of movimientos) {
+            if (!movimiento.empresaId) {
+                movimiento.empresaId = id;
+                await updateEntry(STORES.MOVIMIENTOS, movimiento);
+            }
+        }
+        
+        // Establecer como empresa activa
+        setEmpresaActiva(empresaDefecto);
+        
+        mostrarToast('✅ Empresa principal creada y movimientos migrados', 'success');
+    }
+}
+
+// ✅ Función para cambiar la empresa activa desde el selector
+async function cambiarEmpresaActiva() {
+    const selector = document.getElementById('selectorEmpresaActiva');
+    const empresaId = selector.value;
+    
+    if (empresaId) {
+        const empresa = await getEmpresa(parseInt(empresaId));
+        if (empresa) {
+            setEmpresaActiva(empresa);
+            mostrarToast(`✅ Empresa "${empresa.nombre}" seleccionada como activa`, 'success');
+        }
+    } else {
+        // Opción "Todas las empresas"
+        setEmpresaActiva(null);
+        mostrarToast('✅ Vista consolidada: Todas las empresas', 'success');
+    }
+}
+
+// ✅ Funciones de ayuda para el sistema multi-empresa
+function mostrarAyudaEmpresas() {
+    mostrarConfirmacion(
+        '🏢 SISTEMA MULTI-EMPRESA\n\n' +
+        '¿Cómo funciona?\n\n' +
+        '• REGISTRO: Puedes registrar múltiples empresas con su información completa\n' +
+        '• SELECCIÓN: Elige una empresa activa para filtrar todos los datos\n' +
+        '• MOVIMIENTOS: Cada movimiento se asocia a una empresa específica\n' +
+        '• REPORTES: Genera reportes individuales por empresa o consolidados\n' +
+        '• MIGRACIÓN: Los movimientos existentes se asignan a "Centro Médico Quirúrgico La Fe"\n\n' +
+        '💡 Beneficios:\n' +
+        '- Control separado por cliente/proyecto\n' +
+        '- Mejor organización financiera\n' +
+        '- Reportes detallados por empresa\n' +
+        '- Escalabilidad del sistema\n\n' +
+        'Haz clic en Aceptar para continuar.'
+    );
+}
+
+function mostrarAyudaFormularioEmpresa() {
+    mostrarConfirmacion(
+        '📝 FORMULARIO DE EMPRESA\n\n' +
+        'CAMPOS OBLIGATORIOS:\n' +
+        '• Nombre de la empresa (*)\n\n' +
+        'CAMPOS OPCIONALES:\n' +
+        '• RIF/Identificación: Para fines fiscales\n' +
+        '• Teléfono: Información de contacto\n' +
+        '• Dirección: Ubicación física\n' +
+        '• Sector: Clasificación económica\n\n' +
+        '✏️ EDICIÓN:\n' +
+        'Para editar una empresa existente, haz clic en el botón ✏️ en la lista de empresas.\n\n' +
+        '💡 CONSEJO:\n' +
+        'Usa nombres claros y descriptivos para identificar fácilmente cada empresa.\n\n' +
+        'Haz clic en Aceptar para continuar.'
+    );
+}
+
+function mostrarAyudaListadoEmpresas() {
+    mostrarConfirmacion(
+        '📋 GESTIÓN DE EMPRESAS\n\n' +
+        'BOTONES DE ACCIÓN:\n' +
+        '• ✏️ Editar: Modificar datos de la empresa\n' +
+        '• 🗑️ Eliminar: Borrar empresa (con opción de mantener movimientos)\n' +
+        '• 👁️/✅ Seleccionar: Elegir como empresa activa\n\n' +
+        'INDICADORES VISUALES:\n' +
+        '• Borde azul: Empresa activa actual\n' +
+        '• ✅: Empresa seleccionada como activa\n' +
+        '• 👁️: Empresa disponible para seleccionar\n\n' +
+        '⚠️ ELIMINACIÓN:\n' +
+        'Si eliminas una empresa con movimientos asociados, podrás elegir:\n' +
+        '1. Eliminar también los movimientos\n' +
+        '2. Mantener los movimientos sin empresa asignada\n\n' +
+        'Haz clic en Aceptar para continuar.'
+    );
+}
