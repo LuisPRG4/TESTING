@@ -1,6 +1,12 @@
 /* ---------- FUENTES ---------- */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Space+Mono&display=swap');
 
+.great-vibes-regular {
+  font-family: "Great Vibes", cursive;
+  font-weight: 400;
+  font-style: normal;
+}
+
 /* ---------- VARIABLES BASE ---------- */
 :root {
   --bg: #f5f7fa;
@@ -53,7 +59,6 @@ body.modo-oscuro {
 
 /* ---------- RESET Y BASE ---------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
   font-family: 'Roboto', sans-serif;
   background: var(--bg);
@@ -65,10 +70,9 @@ body {
   align-items: center;
   transition: background var(--transition), color var(--transition);
 }
-
 h1 {
+  font-family: "Great Vibes", cursive;
   font-weight: 300;
-  font-size: 2.25rem;
   margin-bottom: 1.5rem;
   letter-spacing: -0.5px;
   color: var(--primary);
@@ -86,7 +90,6 @@ section {
   margin-bottom: 1.5rem;
   transition: box-shadow var(--transition);
 }
-
 section:hover {
     box-shadow: var(--shadow-lg);
 }
@@ -162,46 +165,50 @@ li {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-radius: var(--radius);
-  background: var(--card-bg);
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 1rem;
-  transition: all var(--transition);
-  border: 1px solid transparent;
-}
-li:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary-light);
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e3e3e3, #ffffff);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  transition: all 0.3s ease;
+  border: 1px solid #dcdcdc;
+  animation: fadeIn 0.5s ease-out;
 }
 
-/* Ajustes para los elementos dentro de la lista de movimientos */
+li:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-color: #a7c5eb;
+}
+
 li .btn-editar, li .btn-eliminar {
-    background: var(--card-bg) !important;
-    border: 1px solid #ccc;
-    color: var(--text);
-    padding: .5rem;
-    width: auto;
-    border-radius: 50% !important;
-    margin: 0;
-    transition: all var(--transition);
+  background: #f4c2c2 !important;
+  border: 1px solid #a7c5eb;
+  color: #00796b;
+  padding: 0.5rem;
+  width: auto;
+  border-radius: 50% !important;
+  margin: 0;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(167, 197, 235, 0.5);
+  font-size: 1.2rem;
 }
 
 li .btn-editar:hover {
-    background: var(--primary) !important;
-    color: white !important;
-    border-color: var(--primary);
-    transform: none;
-    box-shadow: none;
+  background: #a7c5eb !important;
+  color: white !important;
+  border-color: #00796b;
+  box-shadow: 0 0 15px rgba(167, 197, 235, 0.7);
 }
 
 li .btn-eliminar:hover {
-    background: var(--danger) !important;
-    color: white !important;
-    border-color: var(--danger);
-    transform: none;
-    box-shadow: none;
+  background: #b2f2bb !important;
+  color: white !important;
+  border-color: #00796b;
+  box-shadow: 0 0 15px rgba(178, 242, 187, 0.7);
 }
 
 /* ---------- EXTRAS ---------- */
@@ -285,12 +292,15 @@ li .btn-eliminar:hover {
 .side-tab:hover {
   background: rgba(0,0,0,0.05);
 }
+
 body.modo-oscuro .side-tab:hover {
     background: rgba(255,255,255,0.05);
 }
+
 body.modo-claro .side-tab.active {
     background: var(--primary);
 }
+
 body.modo-oscuro .side-tab.active {
     background: var(--primary);
 }
@@ -321,13 +331,13 @@ body.modo-oscuro .side-tab.active {
     transition: transform var(--transition);
     padding: 0;
 }
+
 #btnToggleLista:hover {
     transform: none;
     background: none;
 }
 
 /* ---------- BASE RESPONSIVE ---------- */
-
 @media (max-width: 900px) {
   body { padding: 1rem; }
   .sidebar {
@@ -386,8 +396,7 @@ body { overflow-wrap: break-word; hyphens: auto; }
     to { opacity: 1; }
 }
 
-/* ✅ CONTROL DE TEXTO EN TABLA DE BANCOS */
-/* Tabla de resumen por banco - Diseño flexible */
+/* ✅ CONTROL DE TEXTO EN TABLA DE BANCOS (VERSIÓN IMPRESIÓN PERFECTA) */
 #tablaBancos {
   width: 100%;
   border-collapse: collapse;
@@ -401,71 +410,28 @@ body { overflow-wrap: break-word; hyphens: auto; }
   padding: 0.75rem;
   text-align: right;
   border-bottom: 1px solid #ddd;
-  word-break: break-all; /* ✅ Rompe palabras largas */
-  white-space: normal; /* ✅ Permite saltos de línea naturales */
-  overflow-wrap: break-word; /* ✅ Evita desbordamientos */
-  overflow: hidden; /* ✅ Oculta lo que se sale */
-  text-overflow: ellipsis; /* ✅ Añade "..." si se corta demasiado */
+  word-break: keep-all;        /* ✅ ¡CLAVE! Evita romper palabras */
+  white-space: nowrap;         /* ✅ ¡CLAVE! Evita saltos de línea */
+  overflow: hidden;            /* ✅ Oculta lo que no cabe */
+  text-overflow: ellipsis;     /* ✅ Muestra "..." si se corta */
+  break-inside: avoid;         /* ✅ Evita romper filas al imprimir */
 }
 
 /* Columna de Banco — ancho fijo para nombres largos */
 #tablaBancos th:first-child,
 #tablaBancos td:first-child {
-  width: 28%; /* ✅ 28% del ancho total para el nombre del banco */
-  text-align: left; /* ✅ Alinear a la izquierda para mejor lectura */
-  font-weight: 500;
-  word-break: break-all;
-  white-space: normal;
-  overflow-wrap: break-word;
-  max-width: 250px; /* ✅ Límite máximo de ancho */
-}
-
-/* Columnas de cantidades — ancho fijo y alineación derecha */
-#tablaBancos th:nth-child(2),
-#tablaBancos td:nth-child(2),
-#tablaBancos th:nth-child(3),
-#tablaBancos td:nth-child(3),
-#tablaBancos th:nth-child(4),
-#tablaBancos td:nth-child(4),
-#tablaBancos th:nth-child(5),
-#tablaBancos td:nth-child(5) {
-  width: 18%; /* ✅ 18% para cada columna de monto */
-  text-align: right;
-  font-family: 'Space Mono', monospace; /* ✅ Fuente monoespaciada para números */
-  letter-spacing: -0.2px;
-}
-
-/* Asegurar que el último td (saldo final) no se vea más ancho */
-#tablaBancos td:last-child {
-  font-weight: 700;
-  text-align: right;
-}
-
-#tablaBancos th,
-#tablaBancos td {
-  padding: 0.75rem;
-  text-align: right;
-  border-bottom: 1px solid #ddd;
-  word-break: break-all; /* ✅ Rompe palabras largas */
-  white-space: normal; /* ✅ Permite saltos de línea */
-  overflow-wrap: break-word; /* ✅ Evita desbordamientos */
-  overflow: hidden; /* ✅ Oculta lo que se sale */
-  text-overflow: ellipsis; /* ✅ Añade "..." si se corta demasiado */
-}
-
-/* ✅ Columna de Banco — ancho fijo para nombres largos */
-#tablaBancos th:first-child,
-#tablaBancos td:first-child {
   width: 28%;
   text-align: left;
   font-weight: 500;
-  word-break: break-all;
-  white-space: normal;
-  overflow-wrap: break-word;
+  font-family: 'Roboto', sans-serif;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 250px;
 }
 
-/* ✅ Columnas de cantidades — ancho fijo y alineación derecha */
+/* Columnas de cantidades — ancho fijo, alineación derecha, fuente monoespaciada */
 #tablaBancos th:nth-child(2),
 #tablaBancos td:nth-child(2),
 #tablaBancos th:nth-child(3),
@@ -476,11 +442,15 @@ body { overflow-wrap: break-word; hyphens: auto; }
 #tablaBancos td:nth-child(5) {
   width: 18%;
   text-align: right;
-  font-family: 'Space Mono', monospace; /* ✅ Fuente monoespaciada para números */
-  letter-spacing: -0.2px;
+  font-family: 'Space Mono', Courier, monospace; /* ✅ Fuente perfecta para números */
+  letter-spacing: -0.1px;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ✅ Asegurar que el último td (saldo final) no se vea más ancho */
+/* Asegurar que el último td (saldo final) no se vea más ancho */
 #tablaBancos td:last-child {
   font-weight: 700;
   text-align: right;
@@ -504,9 +474,10 @@ li input[type="text"] {
   font: inherit;
   font-weight: 600;
   color: var(--text);
-  word-break: break-all;
-  white-space: normal;
-  overflow-wrap: break-word;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 100%;
 }
 
@@ -518,9 +489,10 @@ li div:nth-child(3) {
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
-  word-break: break-all;
-  white-space: normal;
-  overflow-wrap: break-word;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ✅ Asegurar que los números en el dashboard no se desborden */
@@ -528,76 +500,10 @@ li div:nth-child(3) {
 #totalGeneral,
 #equivalente {
   font-family: 'Space Mono', monospace;
-  word-break: break-all;
-  white-space: normal;
-  overflow-wrap: break-word;
-}
-
-/* ✅ CALENDARIO VISUAL */
-#calendario {
-  font-size: 0.85rem;
-  margin-bottom: 1.5rem;
-}
-
-#calendario div {
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: 6px;
-  background: #f9f9f9;
-  color: var(--text-light);
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-#calendario div:hover {
-  background: #e8f0fe;
-  transform: scale(1.05);
-}
-
-#calendario div.dia-con-movimiento {
-  background: linear-gradient(135deg, #0b57d0, #5289ed);
-  color: white;
-  font-weight: 600;
-}
-
-#calendario div.dia-con-movimiento::after {
-  content: '';
-  position: absolute;
-  bottom: 0.1rem;
-  width: 0.4rem;
-  height: 0.4rem;
-  background: white;
-  border-radius: 50%;
-}
-
-#calendario div.dia-hoy {
-  border: 2px solid var(--primary);
-  border-radius: 50%;
-  margin: -0.25rem;
-  padding: 0.25rem;
-  background: transparent;
-  color: var(--primary);
-  font-weight: bold;
-}
-
-#calendario div.dia-hoy::after {
-  content: '';
-  position: absolute;
-  bottom: 0.1rem;
-  width: 0.4rem;
-  height: 0.4rem;
-  background: var(--primary);
-  border-radius: 50%;
-}
-
-#calendario div.dia-otro {
-  color: var(--text-light);
-  opacity: 0.5;
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #detallesDia {
@@ -609,16 +515,6 @@ li div:nth-child(3) {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ✅ RESPONSIVE */
-@media (max-width: 768px) {
-  #calendario {
-    grid-template-columns: repeat(7, 1fr);
-    font-size: 0.8rem;
-  }
-  #calendario div {
-    padding: 0.15rem;
-  }
-}
 
 /* ✅ ESTILOS PARA LA PESTAÑA DE AHORRO */
 #graficoAhorro {
@@ -626,4 +522,953 @@ li div:nth-child(3) {
   background: var(--card-bg);
   box-shadow: var(--shadow-sm);
   margin-bottom: 1.5rem;
+}
+
+/* ✅ GRÁFICOS DE COMPARACIÓN DE BANCOS */
+#graficoBarrasApiladas,
+#graficoTortaBancos {
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+
+.side-tab {
+    display: block;
+    padding: 10px;
+    text-align: left;
+    color: #333;
+    background-color: #f4f4f4;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.side-tab.active {
+    background-color: #ddd;
+}
+
+.side-content {
+    display: none;
+}
+
+.side-content.active {
+    display: block;
+}
+
+/* Archivo: styles.txt */
+
+/* ---------------------------------------------------------------------------------- */
+/* ---------- ESTILOS PARA ALERTAS Y CONFIRMACIONES MODERNAS (TOASTS Y MODALES) ----- */
+/* ---------------------------------------------------------------------------------- */
+
+/* Contenedor de Toasts (Notificaciones) */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000; /* Alto para que esté por encima de todo */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none; /* Permite clicks a través del contenedor */
+}
+
+.custom-toast {
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  color: var(--card-bg); /* Texto claro, asume que el fondo del toast es oscuro */
+  font-weight: 500;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  pointer-events: auto; /* Permite interactuar con el toast si es necesario */
+  max-width: 300px;
+}
+
+.custom-toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.custom-toast.success {
+  background-color: var(--success); /* Verde para éxito */
+}
+
+.custom-toast.danger {
+  background-color: var(--danger); /* Rojo para errores */
+}
+
+.custom-toast.info {
+  background-color: var(--primary); /* Azul para información general */
+}
+
+/* Modal de Confirmación (Overlay) */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1500; /* Por encima de todo, pero debajo del toast */
+  display: none; /* Inicialmente oculto */
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+  transition: background 0.3s ease;
+}
+
+.custom-modal-overlay.show {
+  display: flex;
+}
+
+/* Contenido del Modal de Confirmación */
+.custom-modal-content {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 2rem;
+  width: 90%;
+  max-width: 400px;
+  text-align: left; /* Ajustado para mejor lectura */
+  transform: scale(0.9);
+  opacity: 0;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.custom-modal-overlay.show .custom-modal-content {
+  transform: scale(1);
+  opacity: 1;
+}
+
+#confirm-message {
+  color: var(--text);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end; /* Botones a la derecha */
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Estilos de botones */
+.btn-aceptar, .btn-cancelar {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition), opacity var(--transition);
+}
+
+.btn-aceptar {
+  background: var(--primary);
+  color: white;
+}
+.btn-aceptar:hover {
+  background: var(--primary-light);
+}
+
+.btn-cancelar {
+  background: transparent;
+  color: var(--text-light);
+}
+.btn-cancelar:hover {
+  background: rgba(var(--text-light-rgb), 0.1); /* Usar un color más claro para el hover */
+}
+/* Estilo específico para el modo oscuro en el botón cancelar */
+body.modo-oscuro .btn-cancelar, 
+body:not(.modo-claro):not(.modo-oscuro) .btn-cancelar {
+  color: var(--text);
+}
+body.modo-oscuro .btn-cancelar:hover, 
+body:not(.modo-claro):not(.modo-oscuro) .btn-cancelar:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.side-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.side-tab .icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.side-tab:hover .icon {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+/* ======================================================================================
+   🎯 MEJORAS PARA MENÚ LATERAL EXISTENTE
+   ====================================================================================== */
+
+/* Scroll elegante para el menú cuando tenga muchas pestañas */
+.win11-nav {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+
+/* Scrollbar personalizado para navegadores webkit */
+.win11-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.win11-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.win11-nav::-webkit-scrollbar-thumb {
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+/* Buscador integrado en el header del menú */
+.nav-search {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.nav-search input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--text-light);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.nav-search input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Badges de categoría para organizar pestañas */
+.category-badge {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--card-bg);
+  border-radius: 4px;
+  border-left: 3px solid var(--primary);
+}
+
+/* Animación suave para búsqueda */
+.side-tab {
+  transition: all 0.2s ease;
+}
+
+.side-tab[style*="display: none"] {
+  opacity: 0.3;
+  transform: scale(0.95);
+}
+
+/* Mejorar separación visual entre categorías */
+.nav-category-separator {
+  height: 1px;
+  background: var(--text-light);
+  margin: 0.5rem 0;
+  opacity: 0.3;
+}
+
+/* ======================================================================================
+   🎯 BUSCADOR ESPECÍFICO PARA MOVIMIENTOS
+   ====================================================================================== */
+
+/* Buscador específico de movimientos */
+#buscadorMovimientos {
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#buscadorMovimientos:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+/* Animación suave para filtrado de movimientos */
+#listaMovimientos li {
+  transition: all 0.3s ease;
+}
+
+#listaMovimientos li[style*="display: none"] {
+  opacity: 0.3;
+  transform: scale(0.98);
+}
+
+/* Placeholder personalizado para búsqueda */
+#buscadorMovimientos::placeholder {
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* ✅ CALENDARIO VISUAL DE MOVIMIENTOS (NUEVA PESTAÑA) */
+#calendarContainer {
+  font-size: 0.8rem;
+}
+
+#calendarContainer div {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--card-bg-rgb), 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(var(--border-rgb), 0.3);
+  color: var(--text-light);
+  cursor: default;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 28px;
+}
+
+#calendarContainer div:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+#calendarContainer div.day-with-movements {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+#calendarContainer div.day-with-movements::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite alternate;
+}
+
+#calendarContainer div.today {
+  background: rgba(var(--primary-rgb), 0.15);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+#calendarContainer div.today::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite alternate;
+}
+
+#calendarContainer div.weekday {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 0.25rem 0;
+}
+
+#calendarContainer div.empty {
+  background: transparent;
+  border: none;
+}
+
+@keyframes pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+#calendarMonthYear {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ✅ CALENDARIO VISUAL INTERACTIVO (nuevo) */
+#calendarContainer {
+  font-size: 0.8rem;
+}
+
+#calendarContainer div {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--card-bg-rgb), 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(var(--border-rgb), 0.3);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 28px;
+  font-weight: 500;
+}
+
+#calendarContainer div:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+#calendarContainer div.day-with-movements {
+  background: rgba(var(--primary-rgb), 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+#calendarContainer div.day-with-movements::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite alternate;
+}
+
+#calendarContainer div.today {
+  background: rgba(var(--primary-rgb), 0.15);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+#calendarContainer div.today::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite alternate;
+}
+
+#calendarContainer div.weekday {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 0.25rem 0;
+}
+
+#calendarContainer div.empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+@keyframes pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+#calendarMonthYear {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ✅ TARJETAS DE MOVIMIENTOS POR DÍA (copiadas de Presupuesto) */
+.presupuesto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.tarjeta-movimiento {
+  background: rgba(var(--primary-rgb), 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  cursor: default;
+}
+
+.tarjeta-movimiento:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.tarjeta-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.tarjeta-concepto {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tarjeta-categoria {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+.tarjeta-monto {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--danger);
+  text-align: right;
+}
+
+.tarjeta-detalles {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.tarjeta-detalles span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* ✅ PAGINACIÓN DE TARJETAS (igual que Presupuesto) */
+.paginacion-presupuesto {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+.paginacion-presupuesto button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.2s;
+}
+.paginacion-presupuesto button:hover {
+  background: rgba(var(--primary-rgb), 0.1);
+}
+.paginacion-presupuesto button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.paginacion-info {
+  font-size: 0.875rem;
+  color: var(--text-light);
+}
+
+/* ✅ OCULTAR CONTENIDO DE MOVIMIENTOS SI NO HAY DÍA SELECCIONADO */
+#movimientosDiaContainer {
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ESTILOS PARA LA BARRA DE PROGRESO DEL PRESUPUESTO EN LA PESTAÑA PRESUPUESTO SUGERIDO */
+.barra-presupuesto {
+  width: 100%;
+  height: 16px;
+  background-color: #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  margin-top: .5rem;
+}
+
+.barra-uso {
+  height: 100%;
+  width: 0;
+  border-radius: 8px;
+  transition: width 0.8s ease, background-color 0.5s ease;
+}
+
+.barra-label {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-top: 0.3rem;
+}
+
+/* Tarjetas de recordatorios */
+.tarjeta-recordatorio.proximo {
+  background: var(--warning-bg) !important;
+  border-left-color: var(--warning) !important;
+}
+.tarjeta-recordatorio button {
+  background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: background .2s;
+}
+.tarjeta-recordatorio button:hover { background: rgba(0,0,0,.05); }
+
+/* Lista de próximos avisos */
+#ulProximosAvisos { list-style: none; padding: 0; }
+#ulProximosAvisos li { background: var(--card-bg); padding: .75rem; border-radius: 8px; margin-bottom: .5rem; border-left: 4px solid var(--primary); }
+
+/* COLORES POR PRIORIDAD PARA LOS RECORDATORIOS */
+.recordatorio-baja {
+  background-color: #d4edda; /* verde suave */
+}
+
+.recordatorio-media {
+  background-color: #fff3cd; /* amarillo suave */
+}
+
+.recordatorio-alta {
+  background-color: #f8d7da; /* rojo suave */
+}
+
+.recordatorio {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+  border: 1px solid #ccc;
+}
+
+/* ESTILO PARA LAS NOTAS */
+/* ✅ ESTILOS PARA LAS TARJETAS DE NOTAS */
+.tarjeta-nota {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.tarjeta-nota:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.tarjeta-nota h4 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tarjeta-nota p {
+    margin: 0.5rem 0 0 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    /* ✅ Propiedad estándar (para el futuro) */
+    line-clamp: 3; /* 👈 Esta es la propiedad estándar */
+    /* ✅ Propiedad con prefijo (para compatibilidad actual) */
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.tarjeta-nota small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+/* ESTILOS PARA LA PESTAÑA DE IA FINACIERA */
+/* ✅ ESTILOS PARA LA PESTAÑA DE ASISTENTE IA */
+#areaRespuestasIA h3 {
+    color: var(--text);
+    margin-bottom: 1rem;
+}
+
+#contenedorRespuestasIA {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#contenedorRespuestasIA p {
+    color: var(--text-light);
+    text-align: center;
+    margin: 1rem 0;
+}
+
+#inputPreguntaIA {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    min-height: 100px;
+    resize: vertical;
+}
+
+#inputPreguntaIA:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+/* ✅ ESTILOS PARA LAS TARJETAS DE PAGOS */
+.tarjeta-pago {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.tarjeta-pago:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.tarjeta-pago h4 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tarjeta-pago p {
+    margin: 0.5rem 0 0 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    /* ✅ Propiedad estándar (para el futuro) */
+    line-clamp: 3;
+    /* ✅ Propiedad con prefijo (para compatibilidad actual) */
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.tarjeta-pago small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+/* Estilos para la pestaña "Inventario y Activos" */
+/* ✅ ESTILOS PARA LAS TARJETAS DE ACTIVOS */
+.tarjeta-activo {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.tarjeta-activo:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.tarjeta-activo h4 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tarjeta-activo p {
+    margin: 0.5rem 0 0 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    /* ✅ Propiedad estándar (para el futuro) */
+    line-clamp: 3;
+    /* ✅ Propiedad con prefijo (para compatibilidad actual) */
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.tarjeta-activo small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+/* ESTILOS PARA LOS REPORTES GERENCIALES */
+/* ✅ ESTILOS PARA LAS TARJETAS DE REPORTES GERENCIALES */
+.tarjeta-reporte {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.tarjeta-reporte:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.tarjeta-reporte h4 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tarjeta-reporte p {
+    margin: 0.5rem 0 0 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    /* ✅ Propiedad estándar (para el futuro) */
+    line-clamp: 3;
+    /* ✅ Propiedad con prefijo (para compatibilidad actual) */
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.tarjeta-reporte small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+/* ✅ ESTILOS PARA LAS TARJETAS DE REGLAS DEL ASISTENTE FINANCIERO */
+.tarjeta-regla {
+    background: rgba(var(--primary-rgb), 0.05);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.tarjeta-regla:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.tarjeta-regla h4 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.tarjeta-regla p {
+    margin: 0.5rem 0 0 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    /* ✅ Propiedad estándar (para el futuro) */
+    line-clamp: 3;
+    /* ✅ Propiedad con prefijo (para compatibilidad actual) */
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.tarjeta-regla small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.8rem;
+}
+
+/* ✅ ESTILO PARA EL MODAL DE EJEMPLO DEL ASISTENTE FINANCIERO */
+#modalEjemploAsistente .custom-modal-content {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+#modalEjemploAsistente .custom-modal-content h2 {
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+#modalEjemploAsistente .custom-modal-content p {
+    color: var(--text-light);
+    line-height: 1.6;
+    margin: 0 0 1rem 0;
+}
+
+#modalEjemploAsistente .custom-modal-content ul {
+    color: var(--text-light);
+    line-height: 1.6;
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+#modalEjemploAsistente .custom-modal-content .btn-aceptar {
+    background: var(--primary);
+    color: white;
+}
+
+#modalEjemploAsistente .custom-modal-content .btn-cancelar {
+    background: transparent;
+    color: var(--text-light);
+}
+
+#modalBloqueo {
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px); /* Para compatibilidad con navegadores WebKit */
 }
