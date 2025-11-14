@@ -9095,6 +9095,14 @@ window.debugRecordatorios = debugRecordatorios;
 // 🔔 Revisión automática de recordatorios en segundo plano
 // =========================================================
 async function revisarRecordatoriosEnSegundoPlano() {
+
+        // Verificar si la base de datos está disponible antes de intentar usarla
+    if (!db || db.readyState !== 'open') {
+        console.warn(`[DEBUG] Base de datos no disponible en getAllEntries para store: ${storeName}, esperando inicialización...`);
+        // Lanzar un error para que lo capture el try/catch de la función superior
+        throw new Error("Base de datos no inicializada (db es undefined o no está abierta)");
+    }
+    
   try {
     const todos = await getAllRecordatorios();
     if (!todos || todos.length === 0) return;
@@ -11753,4 +11761,3 @@ function mostrarAyudaListadoEmpresas() {
         'Haz clic en Aceptar para continuar.'
     );
 }
-
