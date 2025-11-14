@@ -1,7 +1,7 @@
 // Variable global para la base de datos
 let db;
 const DB_NAME = 'sfpDB';
-const DB_VERSION = 24; // ✅ Versión actual de la base de datos
+const DB_VERSION = 25; // ✅ Versión actual de la base de datos
 
 // (variable global)
 let idRecordatorioEditando = null;
